@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph2"
+    app:startDestination="@id/Collection">
+
+    <fragment android:id="@+id/Collection" android:name="com.whattheforkbomb.collection.fragments.DataCollectionFragment" tools:layout="@layout/fragment_data_collection" android:label="@string/initial_data_collection_label">
+        <argument android:name="@string/motion_arg_name" app:argType="string" android:defaultValue="POINTING_PHONE" />
+        <action android:id="@+id/nav_to_circular_phone" app:destination="@id/Collection" >
+            <argument android:name="@string/motion_arg_name" app:argType="string" android:defaultValue="CIRCULAR_PHONE" />
+        </action>
+        <action android:id="@+id/nav_to_circular_head" app:destination="@id/Collection" >
+            <argument android:name="@string/motion_arg_name" app:argType="string" android:defaultValue="CIRCULAR_HEAD" />
+        </action>
+        <action android:id="@+id/nav_to_pointing_phone" app:destination="@id/Collection" >
+            <argument android:name="@string/motion_arg_name" app:argType="string" android:defaultValue="POINTING_PHONE" />
+        </action>
+        <action android:id="@+id/nav_to_pointing_head" app:destination="@id/Collection" >
+            <argument android:name="@string/motion_arg_name" app:argType="string" android:defaultValue="POINTING_HEAD" />
+        </action>
+    </fragment>
+<!--    <fragment android:id="@+id/CircularMotionPhone" android:name="com.whattheforkbomb.collection.fragments.DataCollectionFragment" tools:layout="@layout/fragment_data_collection" android:label="@string/initial_data_collection_label">-->
+<!--        <argument android:name="motion" app:argType="string" android:defaultValue="@string/circular_phone" />-->
+<!--    </fragment>-->
+<!--    <fragment android:id="@+id/CircularMotionHead" android:name="com.whattheforkbomb.collection.fragments.DataCollectionFragment" tools:layout="@layout/fragment_data_collection" android:label="@string/initial_data_collection_label">-->
+<!--        <argument android:name="motion" app:argType="string" android:defaultValue="@string/circular_head" />-->
+<!--    </fragment>-->
+
+</navigation>

@@ -1,5 +1,6 @@
 package com.whattheforkbomb.collection.fragments
 
+import android.content.Intent
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.util.Log
@@ -12,6 +13,8 @@ import androidx.fragment.app.commit
 import androidx.fragment.app.replace
 import androidx.navigation.fragment.findNavController
 import com.whattheforkbomb.collection.R
+import com.whattheforkbomb.collection.activities.DataCollectionActivity
+import com.whattheforkbomb.collection.activities.MainActivity
 import com.whattheforkbomb.collection.data.TimeRemaining
 import com.whattheforkbomb.collection.databinding.FragmentDataCollectionBinding
 import java.util.concurrent.TimeUnit
@@ -29,17 +32,24 @@ class DataCollectionFragment : Fragment() {
     // onDestroyView.
     private val binding get() = _binding!!
 
-    private var selectedMotion: String? = null
+    private lateinit var selectedMotion: Motions
     private lateinit var timer: CountDownTimer
     private var recording = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        var motionId: String? = null
         arguments?.let {
-            selectedMotion = it.getString(resources.getString(R.string.motion_arg_name))
+            motionId = it.getString(resources.getString(R.string.motion_arg_name))
         }
-        selectedMotion?.let {
-            selectedMotion = resources.getString(R.string.pointing_phone)
+        selectedMotion = if (motionId != null) {
+            try {
+                Motions.valueOf(motionId!!)
+            } catch(ex: IllegalArgumentException) {
+                DEFAULT_MOTION
+            }
+        } else {
+            DEFAULT_MOTION
         }
     }
 
@@ -52,16 +62,33 @@ class DataCollectionFragment : Fragment() {
         return binding.root
     }
 
-    fun setMotion() {
 
-    }
+    private fun reset(motion: Motions) {
+        selectedMotion = motion
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
+        parentFragmentManager.commit {
+            val bundle = bundleOf(getString(R.string.motion_arg_name) to selectedMotion)
+            replace<InstructionsView>(R.id.instructions_placeholder, args = bundle)
+        }
+
+        // Nav
+        binding.buttonNext.setOnClickListener {
+            val nextMotion = selectedMotion.getNext()
+            if (nextMotion != null) {
+                reset(nextMotion)
+            } else {
+                val intent = Intent(activity, MainActivity::class.java)
+                startActivity(intent)
+            }
+        }
 
         // Timer
-        binding.timeRemaining = TimeRemaining(1, 0)
+        binding.timeRemaining = TimeRemaining(0, 30)
         timer = getTimer(binding.timeRemaining!!.minutes, binding.timeRemaining!!.seconds)
+
+        binding.buttonPlayPause.isEnabled = true
+        binding.buttonPlayPause.text = getString(R.string.record)
+        binding.buttonNext.isEnabled = false
 
         binding.buttonPlayPause.setOnClickListener {
             if (recording) {
@@ -79,33 +106,12 @@ class DataCollectionFragment : Fragment() {
                 binding.buttonPlayPause.text = getString(R.string.pause)
             }
         }
+    }
 
-        var destination: Int = R.id.nav_to_circular_phone
-
-        selectedMotion?.let {
-            when (it) {
-                resources.getString(R.string.circular_phone) -> {
-                    destination = R.id.nav_to_circular_head
-                }
-                resources.getString(R.string.circular_head) -> {
-                    destination = R.id.nav_to_pointing_phone
-                }
-                resources.getString(R.string.pointing_phone) -> {
-                    destination = R.id.nav_to_pointing_head
-                }
-                else -> {
-                    destination = R.id.nav_to_circular_phone
-                }
-            }
-        }
-        parentFragmentManager.commit {
-            val bundle = bundleOf(getString(R.string.motion_arg_name) to selectedMotion)
-            replace<InstructionsView>(R.id.instructions_placeholder, args = bundle)
-        }
-        // Nav
-        binding.buttonNext.setOnClickListener {
-            findNavController().navigate(destination)
-        }
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        Log.i(TAG, "Motion: $selectedMotion")
+        reset(selectedMotion)
     }
 
     private fun getTimer(min: Long, sec: Long) = object : CountDownTimer((min*60*1000) + (sec*1000), 1000) {
@@ -127,7 +133,7 @@ class DataCollectionFragment : Fragment() {
         _binding = null
     }
 
-//    companion object {
+    companion object {
 //        /**
 //         * Use this factory method to create a new instance of
 //         * this fragment using the provided parameters.
@@ -145,5 +151,43 @@ class DataCollectionFragment : Fragment() {
 //                    putString(ARG_PARAM2, param2)
 //                }
 //            }
-//    }
+        enum class Motions(val instructionGraphicPath: Int, val instructionsTextId: Int) {
+            POINTING_PHONE(R.drawable.phonepointing, R.string.phone_pointing_instructions) {
+                override fun getNext() = POINTING_HEAD
+            },
+            POINTING_HEAD(R.drawable.phonepointing, R.string.initial_instructions) {
+                override fun getNext() = CIRCULAR_PHONE
+            },
+            CIRCULAR_PHONE(R.drawable.phonepointing, R.string.initial_instructions) {
+                override fun getNext() = CIRCULAR_HEAD
+            },
+            CIRCULAR_HEAD(R.drawable.phonepointing, R.string.initial_instructions) {
+                override fun getNext() = LATERAL_HEAD
+            },
+            LATERAL_HEAD(R.drawable.phonepointing, R.string.initial_instructions) {
+                override fun getNext() = LATERAL_PHONE
+            },
+            LATERAL_PHONE(R.drawable.phonepointing, R.string.initial_instructions) {
+                override fun getNext() = ZOOM_PHONE
+            },
+            ZOOM_PHONE(R.drawable.phonepointing, R.string.initial_instructions) {
+                override fun getNext() = ZOOM_HEAD
+            },
+            ZOOM_HEAD(R.drawable.phonepointing, R.string.initial_instructions) {
+                override fun getNext() = ROTATE_HEAD
+            },
+            ROTATE_HEAD(R.drawable.phonepointing, R.string.initial_instructions) {
+                override fun getNext() = ROTATE_PHONE
+            },
+            ROTATE_PHONE(R.drawable.phonepointing, R.string.initial_instructions) {
+                override fun getNext() = null
+            };
+
+            abstract fun getNext(): Motions?
+
+        }
+
+        val DEFAULT_MOTION = Motions.POINTING_PHONE
+    }
 }
+

@@ -2,14 +2,22 @@ package com.whattheforkbomb.collection.services
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.*
+import android.media.Image
+import android.net.Uri
+import android.util.Log
+import androidx.camera.core.*
 import androidx.camera.core.Camera
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCaptureException
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import java.io.ByteArrayOutputStream
+import java.io.FileOutputStream
 import java.nio.file.Paths
+import java.text.SimpleDateFormat
+import java.time.ZoneOffset.UTC
+import java.time.format.DateTimeFormatter
+import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -40,6 +48,7 @@ class CameraProcessor(participantId: String, private val appContext: Context) {
 
             val imageCapture = ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .setBufferFormat(ImageFormat.YUV_420_888)
                 .build()
 
             camera = cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, imageCapture)
@@ -50,57 +59,59 @@ class CameraProcessor(participantId: String, private val appContext: Context) {
 
     // TODO pass ref to capture method
     private fun scheduleRepeatingCapture(capture: (timestamp: String) -> Unit) {
-
+        // TODO: measure time taken to capture picture
+        // TODO: setup repeating task to take photos
+        val timestamp = SimpleDateFormat("yyyy-MMM-ddTHH:mm:ss.SSS");
+        timestamp.timeZone = TimeZone.getTimeZone("UTC");
+        timestamp.format(Date())
     }
 
     private fun cameraXCapture(imageCapture: ImageCapture, timestamp: String) {
-        val photoFile = createFile(outputDirectory, FILENAME, PHOTO_EXTENSION)
+//        val photoFile = createFile(outputDirectory, FILENAME, PHOTO_EXTENSION)
         val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile)
-            .setMetadata(metadata)
             .build()
 
-        imageCapture.takePicture(outputOptions, cameraExecutor, object : ImageCapture.OnImageSavedCallback {
-                override fun onError(exc: ImageCaptureException) {
-                    Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
-                }
+        imageCapture.takePicture(executor, object : ImageCapture.OnImageCapturedCallback() {
+            override fun onError(exc: ImageCaptureException) {
+                Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
+            }
 
-                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+            override fun onCaptureSuccess(imageProxy: ImageProxy) {
+                super.onCaptureSuccess(imageProxy)
+                imageProxy.use {
+                    val image = imageToBitmap(it.image!!)
+                    val out = FileOutputStream(file)
+                    image.compress(Bitmap.CompressFormat.PNG)
                     val savedUri = output.savedUri ?: Uri.fromFile(photoFile)
-                    Log.d(TAG, "Photo capture succeeded: $savedUri")
-
-                    // We can only change the foreground Drawable using API level 23+ API
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        // Update the gallery thumbnail with latest picture taken
-                        setGalleryThumbnail(savedUri)
-                    }
-
-                    // Implicit broadcasts will be ignored for devices running API level >= 24
-                    // so if you only target API level 24+ you can remove this statement
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-                        requireActivity().sendBroadcast(
-                            Intent(android.hardware.Camera.ACTION_NEW_PICTURE, savedUri)
-                        )
-                    }
-
-                    // If the folder selected is an external media directory, this is
-                    // unnecessary but otherwise other apps will not be able to access our
-                    // images unless we scan them using [MediaScannerConnection]
-                    val mimeType = MimeTypeMap.getSingleton()
-                        .getMimeTypeFromExtension(savedUri.toFile().extension)
-                    MediaScannerConnection.scanFile(
-                        context,
-                        arrayOf(savedUri.toFile().absolutePath),
-                        arrayOf(mimeType)
-                    ) { _, uri ->
-                        Log.d(TAG, "Image capture scanned into media store: $uri")
-                    }
                 }
-            })
+            }
+        })
 
     }
 
     companion object {
         val IMAGES_DIR = "images"
+        val TAG = "CP"
+
+        // Taken from https://stackoverflow.com/a/56812799
+        fun imageToBitmap(image: Image): Bitmap {
+            val yBuffer = image.planes[0].buffer // Y
+            val vuBuffer = image.planes[2].buffer // VU
+
+            val ySize = yBuffer.remaining()
+            val vuSize = vuBuffer.remaining()
+
+            val nv21 = ByteArray(ySize + vuSize)
+
+            yBuffer.get(nv21, 0, ySize)
+            vuBuffer.get(nv21, ySize, vuSize)
+
+            val yuvImage = YuvImage(nv21, ImageFormat.NV21, image.width, image.height, null)
+            val out = ByteArrayOutputStream()
+            yuvImage.compressToJpeg(Rect(0, 0, yuvImage.width, yuvImage.height), 50, out)
+            val imageBytes = out.toByteArray()
+            return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+        }
     }
 
 }

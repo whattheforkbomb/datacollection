@@ -62,7 +62,6 @@ class DataCollectionFragment : Fragment() {
         return binding.root
     }
 
-
     private fun reset(motion: Motions) {
         selectedMotion = motion
 
@@ -77,8 +76,7 @@ class DataCollectionFragment : Fragment() {
             if (nextMotion != null) {
                 reset(nextMotion)
             } else {
-                val intent = Intent(activity, MainActivity::class.java)
-                startActivity(intent)
+                activity!!.finish()
             }
         }
 
@@ -89,6 +87,7 @@ class DataCollectionFragment : Fragment() {
         binding.buttonPlayPause.isEnabled = true
         binding.buttonPlayPause.text = getString(R.string.record)
         binding.buttonNext.isEnabled = false
+        recording = false
 
         binding.buttonPlayPause.setOnClickListener {
             if (recording) {
@@ -190,4 +189,3 @@ class DataCollectionFragment : Fragment() {
         val DEFAULT_MOTION = Motions.POINTING_PHONE
     }
 }
-

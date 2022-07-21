@@ -17,6 +17,7 @@ import com.whattheforkbomb.collection.activities.DataCollectionActivity
 import com.whattheforkbomb.collection.activities.MainActivity
 import com.whattheforkbomb.collection.data.TimeRemaining
 import com.whattheforkbomb.collection.databinding.FragmentDataCollectionBinding
+import com.whattheforkbomb.collection.services.CameraProcessor
 import java.util.concurrent.TimeUnit
 
 /**
@@ -32,9 +33,18 @@ class DataCollectionFragment : Fragment() {
     // onDestroyView.
     private val binding get() = _binding!!
 
+    private lateinit var camera: CameraProcessor
+
     private lateinit var selectedMotion: Motions
     private lateinit var timer: CountDownTimer
     private var recording = false
+    private var readyToRecord: Boolean
+        get() = false
+        set(value) {
+            if (value && !binding.buttonNext.isEnabled) {
+                binding.buttonPlayPause.isEnabled = true
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,6 +61,8 @@ class DataCollectionFragment : Fragment() {
         } else {
             DEFAULT_MOTION
         }
+        camera = CameraProcessor("testing", activity!!.applicationContext) { activity!!.runOnUiThread { readyToRecord = true} }
+        camera.setupCamera(this)
     }
 
     override fun onCreateView(
@@ -81,10 +93,10 @@ class DataCollectionFragment : Fragment() {
         }
 
         // Timer
-        binding.timeRemaining = TimeRemaining(0, 30)
+        binding.timeRemaining = TimeRemaining(0, 5)
         timer = getTimer(binding.timeRemaining!!.minutes, binding.timeRemaining!!.seconds)
 
-        binding.buttonPlayPause.isEnabled = true
+        binding.buttonPlayPause.isEnabled = readyToRecord
         binding.buttonPlayPause.text = getString(R.string.record)
         binding.buttonNext.isEnabled = false
         recording = false
@@ -95,6 +107,7 @@ class DataCollectionFragment : Fragment() {
                 timer.cancel()
 
                 // TODO: Stop recording, ensure save what currently have
+                camera.stop()
 
                 binding.buttonPlayPause.text = getString(R.string.record)
                 timer = getTimer(binding.timeRemaining!!.minutes, binding.timeRemaining!!.seconds)
@@ -102,6 +115,8 @@ class DataCollectionFragment : Fragment() {
                 timer.start()
                 recording = true
                 // TODO: Start recording
+                camera.start(selectedMotion.name)
+
                 binding.buttonPlayPause.text = getString(R.string.pause)
             }
         }
@@ -124,6 +139,7 @@ class DataCollectionFragment : Fragment() {
             binding.buttonNext.isEnabled = true
             binding.buttonPlayPause.isEnabled = false
             // TODO: Stop recording
+            camera.stop()
         }
     }
 

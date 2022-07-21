@@ -115,6 +115,7 @@
                 android:padding="0dip"
                 android:text="@string/record"
                 android:textAlignment="center"
+                android:enabled="false"
                 android:textSize="20sp"/>
 
             <Button

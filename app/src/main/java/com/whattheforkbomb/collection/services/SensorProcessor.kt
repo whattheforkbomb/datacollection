@@ -32,8 +32,6 @@ class SensorProcessor(private val sensorManager: SensorManager, private val exec
     @Volatile private var rawAccelerationVector: FloatArray = FloatArray(6) { 0f }
     @Volatile private var rawGyroVector: FloatArray = FloatArray(6) { 0f }
 
-    private val handler: Handler = Handler()
-
     private fun registerListener(assignValue: (values: FloatArray) -> Unit, sensor: Sensor): Boolean {
         return sensorManager.registerListener(object: SensorEventListener {
             override fun onSensorChanged(event: SensorEvent?) {
@@ -74,8 +72,6 @@ class SensorProcessor(private val sensorManager: SensorManager, private val exec
         }
         startupCallback(started, null)
     }
-
-
 
     override fun registerDataReceivedCallback(dataReceivedCallback: (PhonePositionalData) -> Unit): Boolean {
         return registerListener({linearAccelerationVector = it}, linearAccSensor) &&

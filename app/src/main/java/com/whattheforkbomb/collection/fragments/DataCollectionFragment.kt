@@ -38,7 +38,7 @@ class DataCollectionFragment : Fragment() {
     private lateinit var selectedMotion: Motions
     private lateinit var timer: CountDownTimer
     private var recording = false
-    private var readyToRecord: Boolean
+    private var readyToRecord: Boolean // Replace with variable binding from fragment
         get() = false
         set(value) {
             if (value && !binding.buttonNext.isEnabled) {

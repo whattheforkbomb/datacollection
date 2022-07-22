@@ -57,7 +57,6 @@ class CameraProcessor(participantId: String, private val appContext: Context, pr
     private var captureSession: CameraCaptureSession? = null
     @Volatile private var camera2ShouldCapture = true
     private var camera2ShouldCaptureTimer: Timer? = null
-    private var fileSavingHandler: Handler? = null
 
     @SuppressLint("MissingPermission")
     fun setupCamera(lifecycleOwner: LifecycleOwner) {
@@ -117,7 +116,7 @@ class CameraProcessor(participantId: String, private val appContext: Context, pr
                 val size = cameraManager.getCameraCharacteristics(camera2!!.id).get(
                     CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)!!
                     .getOutputSizes(ImageFormat.RAW_SENSOR).maxByOrNull { it.height * it.width }!!
-                imageReader = ImageReader.newInstance(size.width, size.height, ImageFormat.RAW_SENSOR, IMAGE_BUFFER_SIZE)
+                imageReader = ImageReader.newInstance(size.width, size.height, ImageFormat.RAW_SENSOR, IMAGE_BUFFER_SIZE) // Possibly use PNG to increase frame rate
                 createCaptureSession(camera2!!, imageReader!!.surface)
                 Log.i(TAG, "Camera: $frontCameraId Opened")
             }

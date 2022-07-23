@@ -1,13 +1,12 @@
 package com.whattheforkbomb.collection.services
 
-import android.media.Image
-
 /**
  * Denoting a type of data to be collected
  */
-abstract class DataCollector<T> {
+interface DataCollector { // interface?
 
-
-    // onStop
+     fun setup(onReadyCallback: (setupSuccessful: Boolean) -> Unit)
+     fun start(rootDir: String): Boolean // return whether able to start collection, or have as callback? pass rootDir as Path?
+     fun stop(): Boolean // return whether able to stop collection, or have as callback?
 
 }

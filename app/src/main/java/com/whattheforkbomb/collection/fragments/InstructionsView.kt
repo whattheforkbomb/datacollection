@@ -11,13 +11,12 @@ import android.view.View
 import android.view.ViewGroup
 import com.whattheforkbomb.collection.R
 import com.whattheforkbomb.collection.databinding.FragmentInstructionsViewBinding
-import com.whattheforkbomb.collection.viewmodels.InstructionsViewViewModel
+import com.whattheforkbomb.collection.viewmodels.DataCollectionViewModel
 
 class InstructionsView : Fragment() {
 
     private val TAG = "IV"
     private var _binding: FragmentInstructionsViewBinding? = null
-    private lateinit var viewModel: InstructionsViewViewModel
 
     // This property is only valid between onCreateView and
     // onDestroyView.
@@ -51,14 +50,4 @@ class InstructionsView : Fragment() {
         return binding.root
     }
 
-    override fun onActivityCreated(savedInstanceState: Bundle?) {
-        super.onActivityCreated(savedInstanceState)
-        viewModel = ViewModelProvider(this).get(InstructionsViewViewModel::class.java)
-        // TODO: Use the ViewModel
-    }
-
-
-//    companion object {
-//        fun newInstance() = InstructionsView()
-//    }
 }

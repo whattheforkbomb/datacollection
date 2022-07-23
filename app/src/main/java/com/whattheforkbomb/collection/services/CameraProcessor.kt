@@ -6,11 +6,7 @@ import android.graphics.*
 import android.hardware.camera2.*
 import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
-import android.media.Image
 import android.media.ImageReader
-import android.os.Environment
-import android.os.Handler
-import android.os.HandlerThread
 import android.util.Log
 import android.util.Size
 import android.view.Surface
@@ -37,11 +33,11 @@ import kotlin.io.path.pathString
 
 // Sampling code from: https://github.com/android/camera-samples/blob/main/CameraXBasic/app/src/main/java/com/android/example/cameraxbasic/fragments/CameraFragment.kt
 // Sampling code from: https://github.com/android/camera-samples/blob/main/Camera2Basic/app/src/main/java/com/example/android/camera2/basic/fragments/CameraFragment.kt
-class CameraProcessor(participantId: String, private val appContext: Context, private val onCamera2ReadyCallback: (success: Boolean) -> Unit) {
+class CameraProcessor(private val appContext: Context): DataCollector {
 
-    private var outputDirectory = Paths.get(appContext.applicationContext.getExternalFilesDir(Environment.DIRECTORY_PICTURES)!!.path, participantId).pathString
     private lateinit var executor: ExecutorService
     private lateinit var fileSavingExecutor: ExecutorService
+    private lateinit var onCamera2ReadyCallback: (success: Boolean) -> Unit
 
     // Camera 1
     private var camera: Camera? = null
@@ -59,22 +55,22 @@ class CameraProcessor(participantId: String, private val appContext: Context, pr
     private var camera2ShouldCaptureTimer: Timer? = null
 
     @SuppressLint("MissingPermission")
-    fun setupCamera(lifecycleOwner: LifecycleOwner) {
+    override fun setup(/*lifecycleOwner: LifecycleOwner, */onReadyCallback: (setupSuccessful: Boolean) -> Unit) {
         executor = Executors.newSingleThreadExecutor()
         fileSavingExecutor = Executors.newFixedThreadPool(4)
-        if (CAMERAX_MODE) {
-            setupCameraXImages(lifecycleOwner)
-        } else {
+//        if (CAMERAX_MODE) {
+//            setupCameraXImages(lifecycleOwner)
+//        } else {
             setupCamera2Images()
-        }
+//        }
+        onCamera2ReadyCallback = onReadyCallback
     }
 
     // false means unable to start
-    fun start(motionId: String): Boolean {
-        val photoPath = Paths.get(outputDirectory, motionId, IMAGES_DIR)
+    override fun start(rootDir: String): Boolean {
+        val photoPath = Paths.get(rootDir, IMAGES_DIR)
         return if (CAMERAX_MODE) {
             if (repeatingImageCaptureTask == null) {
-                photoPath.toFile().mkdirs()
                 if (imageCapture != null) {
                     scheduleRepeatingCapture { timestamp: String ->
                         cameraXCapture(
@@ -93,14 +89,16 @@ class CameraProcessor(participantId: String, private val appContext: Context, pr
                 false
             }
         } else {
+            photoPath.toFile().mkdirs()
             camera2ImageCapture(photoPath.pathString)
         }
     }
 
-    fun stop() {
+    override fun stop(): Boolean {
         repeatingImageCaptureTask?.cancel()
         repeatingImageCaptureTask = null
         captureSession?.stopRepeating()
+        return true
     }
 
     @SuppressLint("MissingPermission")
@@ -187,7 +185,7 @@ class CameraProcessor(participantId: String, private val appContext: Context, pr
                             val dngCreator =
                                 DngCreator(cameraManager.getCameraCharacteristics(camera2!!.id), result)
                             val timestamp = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS")
-                            timestamp.timeZone = TimeZone.getTimeZone("UTC");
+                            timestamp.timeZone = TimeZone.getTimeZone("UTC")
                             val photoFile = File(
                                 Paths.get(photoPath, "${timestamp.format(Date())}${RAW_EXT}")
                                     .toUri()

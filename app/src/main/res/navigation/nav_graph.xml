@@ -3,18 +3,37 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/nav_graph"
-    app:startDestination="@id/FirstFragment">
+    app:startDestination="@id/Welcome">
 
     <fragment
-        android:id="@+id/FirstFragment"
+        android:id="@+id/Welcome"
         android:name="com.whattheforkbomb.collection.fragments.InitialInstructions"
         android:label="@string/initial_instructions_label"
         tools:layout="@layout/fragment_initial_instructions">
+        <action android:id="@+id/nav_to_stage_1_data_collection" app:destination="@id/Collection" >
+            <argument android:name="@string/face_detection" app:argType="boolean" android:defaultValue="true" />
+        </action>
     </fragment>
     <fragment
-        android:id="@+id/SecondFragment"
-        android:name="com.whattheforkbomb.collection.fragments.InitialInstructions"
+        android:id="@+id/Collection"
+        android:name="com.whattheforkbomb.collection.fragments.DataCollectionFragment"
+        android:label="@string/initial_data_collection_label"
+        tools:layout="@layout/fragment_data_collection">
+        <action android:id="@+id/nav_to_stage_2_instructions" app:destination="@id/Pause" />
+    </fragment>
+    <fragment
+        android:id="@+id/Pause"
+        android:name="com.whattheforkbomb.collection.fragments.FinalInstructions"
         android:label="@string/final_instructions_label"
+        tools:layout="@layout/fragment_final_instructions">
+        <action android:id="@+id/nav_to_stage_2_data_collection" app:destination="@id/Collection" >
+            <argument android:name="@string/face_detection" app:argType="boolean" android:defaultValue="true" />
+        </action>
+    </fragment>
+    <fragment
+        android:id="@+id/Finish"
+        android:name="com.whattheforkbomb.collection.fragments.FinalInstructions"
+        android:label="@string/exit_label"
         tools:layout="@layout/fragment_final_instructions">
     </fragment>
 </navigation>

@@ -1,6 +1,5 @@
 package com.whattheforkbomb.collection.fragments
 
-import android.content.Intent
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.util.Log
@@ -8,16 +7,20 @@ import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.core.os.bundleOf
+import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.commit
 import androidx.fragment.app.replace
 import androidx.navigation.fragment.findNavController
 import com.whattheforkbomb.collection.R
-import com.whattheforkbomb.collection.activities.DataCollectionActivity
-import com.whattheforkbomb.collection.activities.MainActivity
 import com.whattheforkbomb.collection.data.TimeRemaining
 import com.whattheforkbomb.collection.databinding.FragmentDataCollectionBinding
 import com.whattheforkbomb.collection.services.CameraProcessor
+import com.whattheforkbomb.collection.viewmodels.DataCollectionViewModel
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
@@ -33,9 +36,11 @@ class DataCollectionFragment : Fragment() {
     // onDestroyView.
     private val binding get() = _binding!!
 
-    private lateinit var camera: CameraProcessor
+    private val model: DataCollectionViewModel by activityViewModels()
+    private val executor: Executor = Executors.newSingleThreadExecutor()
 
-    private lateinit var selectedMotion: Motions
+    private var selectedMotion: Motions = DEFAULT_MOTION
+    private var faceDetectionEnabled: Boolean = false
     private lateinit var timer: CountDownTimer
     private var recording = false
     private var readyToRecord: Boolean // Replace with variable binding from fragment
@@ -48,21 +53,7 @@ class DataCollectionFragment : Fragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        var motionId: String? = null
-        arguments?.let {
-            motionId = it.getString(resources.getString(R.string.motion_arg_name))
-        }
-        selectedMotion = if (motionId != null) {
-            try {
-                Motions.valueOf(motionId!!)
-            } catch(ex: IllegalArgumentException) {
-                DEFAULT_MOTION
-            }
-        } else {
-            DEFAULT_MOTION
-        }
-        camera = CameraProcessor("testing", activity!!.applicationContext) { activity!!.runOnUiThread { readyToRecord = true} }
-        camera.setupCamera(this)
+        faceDetectionEnabled = arguments?.getBoolean(resources.getString(R.string.face_detection)) ?: false
     }
 
     override fun onCreateView(
@@ -82,18 +73,22 @@ class DataCollectionFragment : Fragment() {
             replace<InstructionsView>(R.id.instructions_placeholder, args = bundle)
         }
 
+        if (faceDetectionEnabled) parentFragmentManager.commit {
+            replace<FaceIndicator>(R.id.face_indicator_placeholder)
+        }
+
         // Nav
         binding.buttonNext.setOnClickListener {
             val nextMotion = selectedMotion.getNext()
             if (nextMotion != null) {
                 reset(nextMotion)
             } else {
-                activity!!.finish()
+                findNavController().navigate(R.id.nav_to_stage_2_instructions)
             }
         }
 
         // Timer
-        binding.timeRemaining = TimeRemaining(0, 5)
+        binding.timeRemaining = TimeRemaining(0, 30)
         timer = getTimer(binding.timeRemaining!!.minutes, binding.timeRemaining!!.seconds)
 
         binding.buttonPlayPause.isEnabled = readyToRecord
@@ -106,16 +101,15 @@ class DataCollectionFragment : Fragment() {
                 recording = false
                 timer.cancel()
 
-                // TODO: Stop recording, ensure save what currently have
-                camera.stop()
+                model.dataCollectionService.stop()
 
                 binding.buttonPlayPause.text = getString(R.string.record)
                 timer = getTimer(binding.timeRemaining!!.minutes, binding.timeRemaining!!.seconds)
             } else {
                 timer.start()
                 recording = true
-                // TODO: Start recording
-                camera.start(selectedMotion.name)
+
+                model.dataCollectionService.start(selectedMotion)
 
                 binding.buttonPlayPause.text = getString(R.string.pause)
             }
@@ -125,6 +119,23 @@ class DataCollectionFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         Log.i(TAG, "Motion: $selectedMotion")
+        readyToRecord = model.dataCollectionService.ready
+        if (!readyToRecord) executor.execute {
+            model.dataCollectionService.setup {
+                activity!!.runOnUiThread {
+                    readyToRecord = it
+                    if (!it) {
+                        val toast = Toast.makeText(
+                            activity!!.applicationContext,
+                            "Unable to successfully start data collectors... Please check logs and restart.",
+                            Toast.LENGTH_LONG
+                        )
+                        Log.e(TAG, "Failed to start data collectors")
+                        toast.show()
+                    }
+                }
+            }
+        }
         reset(selectedMotion)
     }
 
@@ -138,8 +149,8 @@ class DataCollectionFragment : Fragment() {
         override fun onFinish() {
             binding.buttonNext.isEnabled = true
             binding.buttonPlayPause.isEnabled = false
-            // TODO: Stop recording
-            camera.stop()
+
+            model.dataCollectionService.stop()
         }
     }
 

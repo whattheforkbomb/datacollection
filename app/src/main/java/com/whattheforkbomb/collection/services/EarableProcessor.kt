@@ -1,48 +1,99 @@
 package com.whattheforkbomb.collection.services
 
-import android.app.Activity
-import io.esense.esenselib.*
+import android.bluetooth.BluetoothAdapter
+import android.content.Context
+import android.util.Log
+import androidx.activity.result.contract.ActivityResultContracts
+import com.whattheforkbomb.collection.data.ESenseEvent
+import io.esense.esenselib.ESenseConfig
+import io.esense.esenselib.ESenseConnectionListener
+import io.esense.esenselib.ESenseEventListener
+import io.esense.esenselib.ESenseManager
+import java.io.File
+import java.io.FileWriter
+import java.nio.file.Paths
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
-class EarableProcessor {
-    // TODO: Create something that connects to earable, and handles binding the data collection listeners/callbacks
+
+class EarableProcessor(appContext: Context) : DataCollector {
+
     @Volatile private var range = 0.0
+    private var eSenseManager: ESenseManager? = null
+    private var fileWriter: FileWriter? = null
+    private var esenseConfig: ESenseConfig? = null
+    @Volatile private var ready: Boolean = false
+    private val latch = CountDownLatch(1)
 
-    private fun createConnectionListener() = EarableConnectionListener { range = it }
-}
+    init {
+        val mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+        val pairedDevices = mBluetoothAdapter.bondedDevices
 
-class EarableConnectionListener(private val callback: (range: Double) -> Unit) : ESenseConnectionListener {
-    private var deviceStatus = ""
-    override fun onDeviceFound(manager: ESenseManager) {
-        deviceStatus = "device found"
-        println(deviceStatus)
+        val s: MutableList<String> = ArrayList()
+        for (bt in pairedDevices) s.add(bt.name)
+        Log.i(TAG, "Bluetooth devices:\n${s.joinToString(",")}")
+        val listener = object : ESenseConnectionListener {
+            //
+            override fun onDeviceFound(manager: ESenseManager) {
+                Log.i(TAG, "Device: $EARABLE_DEVICE_NAME found")
+            }
+
+            override fun onDeviceNotFound(manager: ESenseManager) {
+                Log.e(TAG, "Unable to find device: $EARABLE_DEVICE_NAME")
+                ready = false
+                latch.countDown()
+            }
+
+            override fun onConnected(manager: ESenseManager) {
+                Log.i(TAG, "Connected to device: $EARABLE_DEVICE_NAME")
+                val config = ESenseConfig()
+                manager.setSensorConfig(config)
+                range = config.accSensitivityFactor
+                esenseConfig = config
+                ready = true
+                latch.countDown()
+            }
+
+            override fun onDisconnected(manager: ESenseManager) {
+                //
+            }
+        }
+        val manager = ESenseManager(EARABLE_DEVICE_NAME, appContext, listener)
+        manager.connect(CONNECTION_TIMEOUT)
     }
 
-    override fun onDeviceNotFound(manager: ESenseManager) {
-        deviceStatus = "device not found"
-        println(deviceStatus)
+    override fun setup(onReadyCallback: (setupSuccessful: Boolean) -> Unit) {
+        latch.await(9, TimeUnit.SECONDS)
+        onReadyCallback(ready)
     }
 
-    override fun onConnected(manager: ESenseManager) {
-        deviceStatus = "device connected"
-        println(deviceStatus)
-        // you can only listen to sensor data after a device has been connected
-        val eSenseSensorListener = EarableSensorListener()
-        // start listening to earable sensor data
-//        earableManager.registerSensorListener(eSenseSensorListener, 100)
-//        mSocket.emit("esense side connect", sideString)
+    override fun start(rootDir: String): Boolean {
+        Log.i(TAG, "Starting ESense earable processor")
+        val csvFile = File(Paths.get(rootDir, FILE_NAME).toUri())
+        csvFile.createNewFile()
+        val fw = FileWriter(csvFile)
+        fw.appendLine(ESenseEvent.HEADER)
+        fileWriter = fw
+        eSenseManager?.registerSensorListener({ eSenseEvent: ESenseEvent ->
+            Log.i(TAG, "ESense Event received.")
+            fw.appendLine(eSenseEvent.toCSV(esenseConfig!!))
+        }, SAMPLING_RATE)
 
-        // set current eSense configuration so that acceleration scale factor (called 'range') should be 8192 LSB/g (default value)
-//        val eSenseEventListener = EarableEventListener()
-//        earableManager.registerEventListener(eSenseEventListener)
-        val config = ESenseConfig()
-//        earableManager.setSensorConfig(config)
-//        println("range: $range")
-        callback(config.accSensitivityFactor)
+        return true
     }
 
-    override fun onDisconnected(manager: ESenseManager) {
-        deviceStatus = "device not connected"
-        println(deviceStatus)
+    override fun stop(): Boolean {
+        eSenseManager?.unregisterSensorListener()
+        fileWriter?.close()
+        return true
+    }
+
+    companion object {
+        const val TAG = "EP"
+        private const val EARABLE_DEVICE_NAME = "eSense-1635"
+        private const val FILE_NAME = "ESENSE_IMU_GYRO_DATA"
+        private const val CONNECTION_TIMEOUT = 60 * 1000 // 1min
+        private const val SAMPLING_RATE = 60 // 60 times a second / Hz
     }
 }
 
@@ -65,31 +116,4 @@ class EarableEventListener : ESenseEventListener {
     }
 
     override fun onAccelerometerOffsetRead(offsetX: Int, offsetY: Int, offsetZ: Int) {}
-}
-
-// collect eSense sensor data
-internal class EarableSensorListener : ESenseSensorListener {
-    //private float timestamp;
-    //Called when there is a new eSense sensor event (e.g. every time when eSense accelerometer data has changed)
-    override fun onSensorChanged(evt: ESenseEvent) {
-        val accelValues = evt.accel
-        val gyroValues = evt.gyro
-        val timestamp = evt.timestamp
-
-        //getting new eSense data is a background task, move updating the UI onto main thread
-//        Activity.runOnUiThread(Runnable { //updates the UI:
-//            setEarableDataView(accelValues)
-//        })
-//        if (recording) {
-//            //timestamp,acc_x,acc_y,acc_z,gyro_x,_gyro_y,gyro_z
-//            attemptSendESense(timestamp.toString() + "," + accelValues[0] + "," + accelValues[1] + "," + accelValues[2] + "," + gyroValues[0] + "," + gyroValues[1] + "," + gyroValues[2])
-//            attemptSendESenseConverted(
-//                "$timestamp," + accelerometerDataConversion(
-//                    accelValues[0]
-//                ) + "," + accelerometerDataConversion(accelValues[1]) + "," + accelerometerDataConversion(
-//                    accelValues[2]
-//                )
-//            )
-//        }
-    }
 }

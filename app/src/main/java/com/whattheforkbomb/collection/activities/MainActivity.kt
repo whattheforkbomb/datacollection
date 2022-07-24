@@ -18,6 +18,7 @@ import com.whattheforkbomb.collection.R
 import com.whattheforkbomb.collection.databinding.ActivityMainBinding
 import com.whattheforkbomb.collection.services.CameraProcessor
 import com.whattheforkbomb.collection.services.DataCollectionService
+import com.whattheforkbomb.collection.services.EarableProcessor
 import com.whattheforkbomb.collection.services.SensorProcessor
 import com.whattheforkbomb.collection.viewmodels.DataCollectionViewModel
 
@@ -35,6 +36,7 @@ class MainActivity : AppCompatActivity() {
         model.dataCollectionService = DataCollectionService.Builder(filePath)
             .registerDataCollector(CameraProcessor(applicationContext))
             .registerDataCollector(SensorProcessor(getSystemService(Context.SENSOR_SERVICE) as SensorManager))
+            .registerDataCollector(EarableProcessor(applicationContext))
             .build()
 
         binding = ActivityMainBinding.inflate(layoutInflater)

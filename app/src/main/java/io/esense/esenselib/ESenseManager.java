@@ -11,6 +11,8 @@ import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.util.Log;
 
+import com.whattheforkbomb.collection.data.ESenseEvent;
+
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Locale;

@@ -38,7 +38,6 @@ class SensorProcessor(private val sensorManager: SensorManager) : DataCollector 
     @Volatile private var rawGyroVector: FloatArray = FloatArray(6) { 0f }
 
     private var timer: Timer? = null
-//    private val executor: Executor = Executors.newSingleThreadExecutor()
 
     private fun registerListener(assignValue: (values: FloatArray) -> Unit, sensor: Sensor): Boolean {
         return sensorManager.registerListener(object: SensorEventListener {

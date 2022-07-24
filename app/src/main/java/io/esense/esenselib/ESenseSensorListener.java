@@ -1,5 +1,7 @@
 package io.esense.esenselib;
 
+import com.whattheforkbomb.collection.data.ESenseEvent;
+
 public interface ESenseSensorListener {
     /**
      * Called when there is new sensor data available

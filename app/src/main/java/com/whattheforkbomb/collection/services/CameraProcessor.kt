@@ -180,7 +180,7 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                         val (bytes, size) = image.use {
                             Pair(cloneByteBuffer(it.planes[0].buffer), Size(it.width, it.height))
                         }
-                        Log.i(TAG, "Time to copy Bytes: ${currentTimeMillis() - timeToProcessImage}ms")
+                        Log.d(TAG, "Time to copy Bytes: ${currentTimeMillis() - timeToProcessImage}ms")
                         fileSavingExecutor.submit {
                             val dngCreator =
                                 DngCreator(cameraManager.getCameraCharacteristics(camera2!!.id), result)
@@ -195,14 +195,14 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                                 FileOutputStream(photoFile).use {
                                     dngCreator.writeByteBuffer(it, size, bytes, 0)
                                 }
-                                Log.i(TAG, "Image Captured: ${photoFile.absolutePath}, time to save: ${currentTimeMillis() - timeToSaveImage}ms")
+                                Log.d(TAG, "Image Captured: ${photoFile.absolutePath}, time to save: ${currentTimeMillis() - timeToSaveImage}ms")
                             } catch (ioex: IOException) {
                                 Log.e(TAG, "Unable to write DNG image to file", ioex)
                             } catch (iaex: IllegalArgumentException) {
                                 Log.w(TAG, "Unable to write DNG image to file as no pixels available.", iaex)
                             }
                         }
-                        Log.i(TAG, "Time Taken To Process Image: ${currentTimeMillis() - timeToProcessImage}ms, time to prep Image: ${timeToSaveImage - timeToProcessImage}ms")
+                        Log.d(TAG, "Time Taken To Process Image: ${currentTimeMillis() - timeToProcessImage}ms, time to prep Image: ${timeToSaveImage - timeToProcessImage}ms")
                     } else {
                         Log.w(TAG, "Unable to save image as none present.")
                     }

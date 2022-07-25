@@ -1,5 +1,8 @@
 package io.esense.esenselib;
 
+import static android.bluetooth.BluetoothGattCharacteristic.PERMISSION_READ;
+import static android.bluetooth.BluetoothGattCharacteristic.PROPERTY_READ;
+
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
@@ -195,7 +198,7 @@ public class ESenseManager {
      */
     public boolean setSensorConfig(ESenseConfig config) {
         if(config != null) {
-            BluetoothGattCharacteristic c = mCharacteristicMap.get(SENSOR_CONFIG_CHARACTERISTIC);
+            BluetoothGattCharacteristic c = new BluetoothGattCharacteristic(UUID.fromString(SENSOR_CONFIG_CHARACTERISTIC), PROPERTY_READ, PERMISSION_READ); //mCharacteristicMap.get(SENSOR_CONFIG_CHARACTERISTIC);
             byte[] bytes = config.prepareCharacteristicData();
             bytes[1] = getCheckSum(bytes,1);
             c.setValue(bytes);
@@ -470,6 +473,7 @@ public class ESenseManager {
             for (BluetoothGattService s : gatt.getServices()) {
                 for (BluetoothGattCharacteristic c : s.getCharacteristics()) {
                     mCharacteristicMap.put(getKey(c), c);
+                    Log.i(TAG, getKey(c));
                 }
             }
 

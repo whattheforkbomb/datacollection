@@ -91,7 +91,7 @@ class EarableProcessor(appContext: Context) : DataCollector {
     companion object {
         const val TAG = "EP"
         private const val EARABLE_DEVICE_NAME = "eSense-1635"
-        private const val FILE_NAME = "ESENSE_IMU_GYRO_DATA"
+        private const val FILE_NAME = "ESENSE_IMU_GYRO_DATA.csv"
         private const val CONNECTION_TIMEOUT = 60 * 1000 // 1min
         private const val SAMPLING_RATE = 60 // 60 times a second / Hz
     }

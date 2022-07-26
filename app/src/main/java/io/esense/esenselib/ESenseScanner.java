@@ -46,7 +46,7 @@ public class ESenseScanner extends ScanCallback {
         super.onScanResult(callbackType, result);
         Log.i(TAG, "Device Found");
         BluetoothDevice _device = result.getDevice();
-        if (_device != null) {
+        if (_device != null && mDeviceName.matches(_device.getName())) {
             stopScan();
             mDevice = _device;
 

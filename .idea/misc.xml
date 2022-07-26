@@ -7,7 +7,9 @@
         <entry key="..\:/Uni/CM50175/data-collection-app/app/src/main/res/layout/activity_data_collection.xml" value="0.5359375" />
         <entry key="..\:/Uni/CM50175/data-collection-app/app/src/main/res/layout/activity_main.xml" value="0.5359375" />
         <entry key="..\:/Uni/CM50175/data-collection-app/app/src/main/res/layout/content_data_collection.xml" value="0.5359375" />
-        <entry key="..\:/Uni/CM50175/data-collection-app/app/src/main/res/layout/fragment_data_collection.xml" value="0.55" />
+        <entry key="..\:/Uni/CM50175/data-collection-app/app/src/main/res/layout/content_main.xml" value="0.2875" />
+        <entry key="..\:/Uni/CM50175/data-collection-app/app/src/main/res/layout/fragment_data_collection.xml" value="0.5038387715930902" />
+        <entry key="..\:/Uni/CM50175/data-collection-app/app/src/main/res/layout/fragment_face_indicator.xml" value="0.2734375" />
         <entry key="..\:/Uni/CM50175/data-collection-app/app/src/main/res/layout/fragment_final_instructions.xml" value="0.55" />
         <entry key="..\:/Uni/CM50175/data-collection-app/app/src/main/res/layout/fragment_initial_instructions.xml" value="0.55" />
         <entry key="..\:/Uni/CM50175/data-collection-app/app/src/main/res/layout/fragment_instructions_view.xml" value="0.25" />

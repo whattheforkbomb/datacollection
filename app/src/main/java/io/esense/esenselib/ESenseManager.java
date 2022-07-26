@@ -403,6 +403,19 @@ public class ESenseManager {
         }
     }
 
+    public boolean connect(BluetoothDevice device, int timeout){
+        try {
+            Log.i(TAG, "Attempting to connect to bluetooth device: " + device.getName());
+            mGatt = device.connectGatt(mContext, false, mGattCallback, BluetoothDevice.TRANSPORT_LE);
+            mDevice = device;
+            Log.i(TAG, "Connected to device: " + mDevice.getName());
+            return true;
+        } catch(RuntimeException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     /**
      * Scans for the device with the name specified when the manager was constructed.
      * The events {@link ESenseConnectionListener#onDeviceFound(ESenseManager manager)}, {@link ESenseConnectionListener#onDeviceNotFound(ESenseManager manager)} are fired if the device has been found or if it was not found.
@@ -423,6 +436,7 @@ public class ESenseManager {
 
                 if(deviceFoundLatch.getCount() == 0){
                     mDevice = scanner.getDevice();
+                    Log.i(TAG, "Device found, name: " + getDeviceName());
                     if(mConnectionListener != null) {
                         mConnectionListener.onDeviceFound(ESenseManager.this);
                     }
@@ -456,9 +470,12 @@ public class ESenseManager {
 
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+            Log.i(TAG, "Connection state changed");
             if (newState == BluetoothProfile.STATE_CONNECTED) {
+                Log.i(TAG, "Connected");
                 gatt.discoverServices();
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                Log.i(TAG, "Disconnected");
                 gatt.close();
                 mCharacteristicMap.clear();
                 if(mConnectionListener != null) {
@@ -470,6 +487,7 @@ public class ESenseManager {
 
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+            Log.i(TAG, "Connecting to bluetooth device");
             for (BluetoothGattService s : gatt.getServices()) {
                 for (BluetoothGattCharacteristic c : s.getCharacteristics()) {
                     mCharacteristicMap.put(getKey(c), c);

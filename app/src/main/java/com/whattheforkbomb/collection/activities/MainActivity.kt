@@ -62,9 +62,9 @@ class MainActivity : AppCompatActivity() {
 //        Thread {
 //            listOf(
 ////                android.Manifest.permission.CAMERA,
-////                android.Manifest.permission.BLUETOOTH_CONNECT,
-//                android.Manifest.permission.BLUETOOTH_SCAN,
-//                android.Manifest.permission.BLUETOOTH_ADVERTISE,
+//                android.Manifest.permission.BLUETOOTH_CONNECT,
+////                android.Manifest.permission.BLUETOOTH_SCAN,
+////                android.Manifest.permission.BLUETOOTH_ADVERTISE,
 ////                android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
 //            ).forEach {
 //                val latch = CountDownLatch(1)

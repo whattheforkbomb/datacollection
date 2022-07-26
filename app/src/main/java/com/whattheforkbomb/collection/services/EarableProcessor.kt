@@ -1,14 +1,12 @@
 package com.whattheforkbomb.collection.services
 
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.util.Log
-import androidx.activity.result.contract.ActivityResultContracts
 import com.whattheforkbomb.collection.data.ESenseEvent
-import io.esense.esenselib.ESenseConfig
-import io.esense.esenselib.ESenseConnectionListener
-import io.esense.esenselib.ESenseEventListener
-import io.esense.esenselib.ESenseManager
+import io.esense.esenselib.*
 import java.io.File
 import java.io.FileWriter
 import java.nio.file.Paths
@@ -27,11 +25,9 @@ class EarableProcessor(appContext: Context) : DataCollector {
 
     init {
         val mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
-        val pairedDevices = mBluetoothAdapter.bondedDevices
+        val pairedDevices = mBluetoothAdapter.bondedDevices.toSet()
 
-        val s: MutableList<String> = ArrayList()
-        for (bt in pairedDevices) s.add(bt.name)
-        Log.i(TAG, "Bluetooth devices:\n${s.joinToString(",")}")
+        Log.i(TAG, "Bluetooth devices:\n${pairedDevices.joinToString(",") { it.name }}")
         val listener = object : ESenseConnectionListener {
             //
             override fun onDeviceFound(manager: ESenseManager) {
@@ -50,16 +46,25 @@ class EarableProcessor(appContext: Context) : DataCollector {
                 manager.setSensorConfig(config)
                 range = config.accSensitivityFactor
                 esenseConfig = config
+                eSenseManager = manager
                 ready = true
                 latch.countDown()
             }
 
             override fun onDisconnected(manager: ESenseManager) {
                 //
+                Log.i(TAG, "For some reason being disconnected")
             }
         }
         val manager = ESenseManager(EARABLE_DEVICE_NAME, appContext, listener)
-        manager.connect(CONNECTION_TIMEOUT)
+
+        val pairedDevice = pairedDevices.firstOrNull { EARABLE_DEVICE_NAME == it.name }
+
+        if (pairedDevice != null ) {
+            manager.connect(pairedDevice, CONNECTION_TIMEOUT)
+        } else {
+            manager.connect(CONNECTION_TIMEOUT)
+        }
     }
 
     override fun setup(onReadyCallback: (setupSuccessful: Boolean) -> Unit) {
@@ -90,7 +95,7 @@ class EarableProcessor(appContext: Context) : DataCollector {
 
     companion object {
         const val TAG = "EP"
-        private const val EARABLE_DEVICE_NAME = "eSense-1635"
+        private const val EARABLE_DEVICE_NAME = "eSense-0467" //"eSense-1635"
         private const val FILE_NAME = "ESENSE_IMU_GYRO_DATA.csv"
         private const val CONNECTION_TIMEOUT = 60 * 1000 // 1min
         private const val SAMPLING_RATE = 60 // 60 times a second / Hz

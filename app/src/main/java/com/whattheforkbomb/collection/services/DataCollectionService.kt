@@ -66,7 +66,6 @@ class DataCollectionService private constructor(private val rootDir: Path, priva
     fun setup(onReady: (setupSuccess: Boolean) -> Unit) = runBlocking {
         val success = ConcurrentHashMap<DataCollector, Boolean>()
 
-        Log.i(TAG, "Requesting any missing permissions")
         if (permissionsService.checkOrGetPerms(activity)) {
             dataCollectors.parallelStream().forEach { collector ->
                 Log.i(TAG, "Starting ${collector.javaClass.name}...")

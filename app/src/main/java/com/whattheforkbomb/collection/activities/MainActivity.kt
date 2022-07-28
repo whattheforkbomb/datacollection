@@ -3,6 +3,7 @@ package com.whattheforkbomb.collection.activities
 import android.content.Context
 import android.hardware.SensorManager
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -19,12 +20,11 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var binding: ActivityMainBinding
-    private val permissionsService = PermissionsService()
+    private val model: DataCollectionViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        val model: DataCollectionViewModel by viewModels()
         val filePath = applicationContext.getExternalFilesDir(null)!!.toPath()
         model.dataCollectionService = DataCollectionService.Builder(filePath, this)
             .registerDataCollector(CameraProcessor(applicationContext))
@@ -50,6 +50,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        permissionsService.onPermsResult(permissions, grantResults)
+        Log.i("MA", "Permission request result received")
+        model.dataCollectionService.permissionsService.onPermsResult(permissions, grantResults)
     }
 }

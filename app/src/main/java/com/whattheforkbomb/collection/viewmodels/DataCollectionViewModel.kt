@@ -2,6 +2,7 @@ package com.whattheforkbomb.collection.viewmodels
 
 import androidx.lifecycle.ViewModel
 import com.whattheforkbomb.collection.services.DataCollectionService
+import java.util.concurrent.CountDownLatch
 
 class DataCollectionViewModel : ViewModel() {
 

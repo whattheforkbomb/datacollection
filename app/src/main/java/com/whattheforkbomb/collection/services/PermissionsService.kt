@@ -5,15 +5,16 @@ import android.content.pm.PackageManager
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Service to ensure required permissions are obtained prior to attempting to interface with
  *  permission restricted hardware (camera and sensors)
  */
-class PermissionsService {
+class PermissionsService() {
 
-    private val latch: CountDownLatch = CountDownLatch(1)
     private val requiredPermissions: MutableMap<String, Boolean> = mutableMapOf()
+    private val latch = CountDownLatch(1)
 
     fun checkOrGetPerms(activity: Activity): Boolean {
         permissions.filter {
@@ -24,7 +25,10 @@ class PermissionsService {
 
         return if (requiredPermissions.isNotEmpty()) {
             ActivityCompat.requestPermissions(activity, requiredPermissions.keys.toTypedArray(), 1)
+            Log.i(TAG, "Permissions requested: ${requiredPermissions.keys.joinToString()}")
+            Log.i(DataCollectionService.TAG, "Awaiting count down, count: ${latch.count}")
             latch.await()
+            Log.i(DataCollectionService.TAG, "Verifying permissions granted")
             requiredPermissions.values.all { it }
         } else true
     }
@@ -35,7 +39,9 @@ class PermissionsService {
         results.forEach {
             requiredPermissions[it.first] = (it.second == PackageManager.PERMISSION_GRANTED)
         }
+        Log.i(TAG, "Counting down: ${requiredPermissions.entries.joinToString()}")
         latch.countDown()
+        Log.i(TAG, "Count down complete, count: ${latch.count}")
     }
 
     companion object {

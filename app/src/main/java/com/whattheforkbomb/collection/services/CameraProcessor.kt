@@ -2,6 +2,7 @@ package com.whattheforkbomb.collection.services
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.TypedArray
 import android.graphics.*
 import android.hardware.camera2.*
 import android.hardware.camera2.params.OutputConfiguration
@@ -9,6 +10,7 @@ import android.hardware.camera2.params.SessionConfiguration
 import android.media.Image
 import android.media.ImageReader
 import android.util.Log
+import android.util.Range
 import android.util.Size
 import android.view.Surface
 import androidx.camera.core.CameraSelector
@@ -23,6 +25,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.fixedRateTimer
 import kotlin.io.path.pathString
 
@@ -45,6 +48,7 @@ class CameraProcessor(private val appContext: Context): DataCollector {
 
     @SuppressLint("MissingPermission")
     override fun setup(onReadyCallback: (setupSuccessful: Boolean) -> Unit) {
+
         executor = Executors.newSingleThreadExecutor()
         fileSavingExecutor = Executors.newFixedThreadPool(4)
         setupCamera2Images()
@@ -73,12 +77,34 @@ class CameraProcessor(private val appContext: Context): DataCollector {
         cameraManager.openCamera(frontCameraId, executor, object : CameraDevice.StateCallback() {
             override fun onOpened(device: CameraDevice) {
                 camera2 = device
+                val characteristics = cameraManager.getCameraCharacteristics(camera2!!.id)
+
+                // Check camera abilities
+                val isoRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE) as Range<Int>?
+                if(null != isoRange) {
+                    Log.i(TAG, "iso range => lower : ${isoRange.lower}, higher : ${isoRange.upper}")
+                } else {
+                    Log.w(TAG, "iso range => NULL NOT SUPPORTED")
+                }
+                val exposureTimeRange = characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE) as Range<Long>?
+                if(null != exposureTimeRange) {
+                    Log.i(TAG, "exposure range => lower : ${exposureTimeRange.lower}, higher : ${exposureTimeRange.upper}")
+                } else {
+                    Log.w(TAG, "exposure range => NULL NOT SUPPORTED")
+                }
+                val apertureRange = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_APERTURES)
+                if(null != apertureRange) {
+                    Log.i(TAG, "aperture range => ${apertureRange.joinToString()}")
+                } else {
+                    Log.w(TAG, "aperture range => NULL NOT SUPPORTED")
+                }
+
                 val format = if (RAW_MODE) ImageFormat.RAW_SENSOR else ImageFormat.YUV_420_888
-                val size = cameraManager.getCameraCharacteristics(camera2!!.id)
-                    .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)!!
+                val sizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)!!
                     .getOutputSizes(format)
-                    .maxByOrNull { it.height * it.width }!!
-                imageReader = ImageReader.newInstance(size.width, size.height, format, IMAGE_BUFFER_SIZE)
+                Log.i(TAG, "Possible sizes: ${sizes.joinToString()}")
+                val size = sizes.maxByOrNull { it.height * it.width }!!
+                imageReader = ImageReader.newInstance(1920, 1080, format, IMAGE_BUFFER_SIZE)
                 createCaptureSession(camera2!!, imageReader!!.surface)
                 Log.i(TAG, "Camera: $frontCameraId Opened")
             }
@@ -124,11 +150,16 @@ class CameraProcessor(private val appContext: Context): DataCollector {
     // OOM Error also likely if saving RAW...
     private fun camera2ImageCapture(photoPath: String): Boolean = if (camera2 != null) {
         Log.i(TAG, "Setting-up repeating capture request for camera2")
-        val request = camera2!!.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+        val request = camera2!!.createCaptureRequest(CameraDevice.TEMPLATE_RECORD)
         request.addTarget(imageReader!!.surface)
-        request.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO)
-        request.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
-        request.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+//        request.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO)
+//        request.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+//        request.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+        request.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
+        request.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO)
+        request.set(CaptureRequest.SENSOR_SENSITIVITY, 200)
+        request.set(CaptureRequest.SENSOR_EXPOSURE_TIME, TimeUnit.MILLISECONDS.toNanos(5))
+
         camera2ShouldCaptureTimer = fixedRateTimer("Camera2ShouldCaptureTimer", true, period = SAMPLE_RATE) {
             camera2ShouldCapture = true
         }
@@ -205,9 +236,10 @@ class CameraProcessor(private val appContext: Context): DataCollector {
         private const val PNG_EXT = ".png"
         private const val RAW_EXT = ".dng"
         private const val TAG = "CP"
-        private const val SAMPLE_RATE = (1000 / 50).toLong()
+        private const val SAMPLE_RATE = (1000 / 30).toLong()
         private const val IMAGE_BUFFER_SIZE: Int = 3
         private const val RAW_MODE = true
+        private const val SENSOR_ROTATION_COMPENSATION = -270
 
         // Taken from https://stackoverflow.com/a/56812799
         fun imageToBitmap(image: Image): Bitmap {

@@ -1,5 +1,6 @@
 package com.whattheforkbomb.collection.services
 
+import android.app.Activity
 import android.util.Log
 import com.whattheforkbomb.collection.fragments.DataCollectionFragment
 import kotlinx.coroutines.runBlocking
@@ -11,7 +12,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.pathString
 
-class DataCollectionService private constructor(private val rootDir: Path, private val dataCollectors: Set<DataCollector>) {
+class DataCollectionService private constructor(private val rootDir: Path, private val dataCollectors: Set<DataCollector>, private val activity: Activity) {
 
     private lateinit var participantId: UUID
     private lateinit var filePath: Path
@@ -19,6 +20,7 @@ class DataCollectionService private constructor(private val rootDir: Path, priva
         private set
     private val latch = CountDownLatch(dataCollectors.size)
     @Volatile private var running = false
+    val permissionsService = PermissionsService()
 
     init {
         generateNewParticipantId()
@@ -63,36 +65,39 @@ class DataCollectionService private constructor(private val rootDir: Path, priva
 
     fun setup(onReady: (setupSuccess: Boolean) -> Unit) = runBlocking {
         val success = ConcurrentHashMap<DataCollector, Boolean>()
-        dataCollectors.parallelStream().forEach { collector ->
-            Log.i(TAG, "Starting ${collector.javaClass.name}...")
-            collector.setup {
-                success[collector] = it
-                Log.i(TAG, "Countdown ${collector.javaClass.name}...")
-                latch.countDown()
-            }
-        }
 
-        try {
-            latch.await(10, TimeUnit.SECONDS)
-        } catch (iex: InterruptedException) {
-            // Failure, who would interrupt here?
+        Log.i(TAG, "Requesting any missing permissions")
+        if (permissionsService.checkOrGetPerms(activity)) {
+            dataCollectors.parallelStream().forEach { collector ->
+                Log.i(TAG, "Starting ${collector.javaClass.name}...")
+                collector.setup {
+                    success[collector] = it
+                    Log.i(TAG, "Countdown ${collector.javaClass.name}...")
+                    latch.countDown()
+                }
+            }
+            try {
+                latch.await(10, TimeUnit.SECONDS)
+            } catch (iex: InterruptedException) {
+                // Failure, who would interrupt here?
+            }
+            Log.i(TAG, success.entries.joinToString(" | "))
+            ready = dataCollectors.stream().map { success.getOrDefault(it, false) }.allMatch { it }
+        } else {
+            Log.e(TAG, "Not all permissions were provided.")
+
+            ready = false
         }
-        Log.i(TAG, success.entries.joinToString(" | "))
-        ready = dataCollectors.stream().map { success.getOrDefault(it, false) }.allMatch { it }
         Log.i(TAG, "ready: $ready")
         onReady(ready)
     }
 
-    class Builder(private val rootDir: Path, private val dataCollectors: Set<DataCollector>) {
-        constructor(rootDir: Path): this(rootDir, HashSet())
+    class Builder(private val rootDir: Path, private val dataCollectors: Set<DataCollector>, private val activity: Activity) {
+        constructor(rootDir: Path, activity: Activity): this(rootDir, HashSet(), activity)
 
-        fun registerDataCollector(dataCollector: DataCollector): Builder {
-            return Builder(rootDir, dataCollectors + dataCollector)
-        }
+        fun registerDataCollector(dataCollector: DataCollector) = Builder(rootDir, dataCollectors + dataCollector, activity)
 
-        fun build(): DataCollectionService {
-            return DataCollectionService(rootDir, dataCollectors)
-        }
+        fun build(): DataCollectionService = DataCollectionService(rootDir, dataCollectors, activity)
 
     }
 

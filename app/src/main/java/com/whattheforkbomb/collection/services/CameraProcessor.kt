@@ -6,17 +6,12 @@ import android.graphics.*
 import android.hardware.camera2.*
 import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
+import android.media.Image
 import android.media.ImageReader
 import android.util.Log
 import android.util.Size
 import android.view.Surface
-import androidx.camera.core.*
-import androidx.camera.core.Camera
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.video.Quality
-import androidx.camera.video.QualitySelector
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.LifecycleOwner
+import androidx.camera.core.CameraSelector
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -31,20 +26,14 @@ import java.util.concurrent.Executors
 import kotlin.concurrent.fixedRateTimer
 import kotlin.io.path.pathString
 
-// Sampling code from: https://github.com/android/camera-samples/blob/main/CameraXBasic/app/src/main/java/com/android/example/cameraxbasic/fragments/CameraFragment.kt
 // Sampling code from: https://github.com/android/camera-samples/blob/main/Camera2Basic/app/src/main/java/com/example/android/camera2/basic/fragments/CameraFragment.kt
 class CameraProcessor(private val appContext: Context): DataCollector {
 
     private lateinit var executor: ExecutorService
     private lateinit var fileSavingExecutor: ExecutorService
-    private lateinit var onCamera2ReadyCallback: (success: Boolean) -> Unit
-
-    // Camera 1
-    private var camera: Camera? = null
-    private var imageCapture: ImageCapture? = null
-    private var repeatingImageCaptureTask: Timer? = null
 
     // Camera 2
+    private lateinit var onCamera2ReadyCallback: (success: Boolean) -> Unit
     private val cameraManager: CameraManager by lazy {
         appContext.getSystemService(Context.CAMERA_SERVICE) as CameraManager
     }
@@ -55,48 +44,21 @@ class CameraProcessor(private val appContext: Context): DataCollector {
     private var camera2ShouldCaptureTimer: Timer? = null
 
     @SuppressLint("MissingPermission")
-    override fun setup(/*lifecycleOwner: LifecycleOwner, */onReadyCallback: (setupSuccessful: Boolean) -> Unit) {
+    override fun setup(onReadyCallback: (setupSuccessful: Boolean) -> Unit) {
         executor = Executors.newSingleThreadExecutor()
         fileSavingExecutor = Executors.newFixedThreadPool(4)
-//        if (CAMERAX_MODE) {
-//            setupCameraXImages(lifecycleOwner)
-//        } else {
-            setupCamera2Images()
-//        }
+        setupCamera2Images()
         onCamera2ReadyCallback = onReadyCallback
     }
 
     // false means unable to start
     override fun start(rootDir: String): Boolean {
         val photoPath = Paths.get(rootDir, IMAGES_DIR)
-        return if (CAMERAX_MODE) {
-            if (repeatingImageCaptureTask == null) {
-                if (imageCapture != null) {
-                    scheduleRepeatingCapture { timestamp: String ->
-                        cameraXCapture(
-                            imageCapture!!,
-                            timestamp,
-                            photoPath.pathString
-                        )
-                    }
-                    true
-                } else {
-                    Log.e(TAG, "Unable to begin captures as imageCapture is null")
-                    false
-                }
-            } else {
-                Log.e(TAG, "Unable to begin captures as recording already running")
-                false
-            }
-        } else {
-            photoPath.toFile().mkdirs()
-            camera2ImageCapture(photoPath.pathString)
-        }
+        photoPath.toFile().mkdirs()
+        return camera2ImageCapture(photoPath.pathString)
     }
 
     override fun stop(): Boolean {
-        repeatingImageCaptureTask?.cancel()
-        repeatingImageCaptureTask = null
         captureSession?.stopRepeating()
         return true
     }
@@ -111,10 +73,12 @@ class CameraProcessor(private val appContext: Context): DataCollector {
         cameraManager.openCamera(frontCameraId, executor, object : CameraDevice.StateCallback() {
             override fun onOpened(device: CameraDevice) {
                 camera2 = device
-                val size = cameraManager.getCameraCharacteristics(camera2!!.id).get(
-                    CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)!!
-                    .getOutputSizes(ImageFormat.RAW_SENSOR).maxByOrNull { it.height * it.width }!!
-                imageReader = ImageReader.newInstance(size.width, size.height, ImageFormat.RAW_SENSOR, IMAGE_BUFFER_SIZE) // Possibly use PNG to increase frame rate
+                val format = if (RAW_MODE) ImageFormat.RAW_SENSOR else ImageFormat.YUV_420_888
+                val size = cameraManager.getCameraCharacteristics(camera2!!.id)
+                    .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)!!
+                    .getOutputSizes(format)
+                    .maxByOrNull { it.height * it.width }!!
+                imageReader = ImageReader.newInstance(size.width, size.height, format, IMAGE_BUFFER_SIZE)
                 createCaptureSession(camera2!!, imageReader!!.surface)
                 Log.i(TAG, "Camera: $frontCameraId Opened")
             }
@@ -168,6 +132,7 @@ class CameraProcessor(private val appContext: Context): DataCollector {
         camera2ShouldCaptureTimer = fixedRateTimer("Camera2ShouldCaptureTimer", true, period = SAMPLE_RATE) {
             camera2ShouldCapture = true
         }
+        val extension = if (RAW_MODE) RAW_EXT else PNG_EXT
         captureSession!!.setSingleRepeatingRequest(request.build(), executor, object : CameraCaptureSession.CaptureCallback() {
             override fun onCaptureCompleted(session: CameraCaptureSession, request: CaptureRequest, result: TotalCaptureResult) {
                 super.onCaptureCompleted(session, request, result)
@@ -175,31 +140,51 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                     val image = imageReader?.acquireLatestImage()
                     if (image != null) {
                         camera2ShouldCapture = false
-                        var timeToSaveImage: Long = 0L
+                        var timeToSaveImage = 0L
                         val timeToProcessImage = currentTimeMillis()
-                        val (bytes, size) = image.use {
-                            Pair(cloneByteBuffer(it.planes[0].buffer), Size(it.width, it.height))
-                        }
-                        Log.d(TAG, "Time to copy Bytes: ${currentTimeMillis() - timeToProcessImage}ms")
-                        fileSavingExecutor.submit {
-                            val dngCreator =
-                                DngCreator(cameraManager.getCameraCharacteristics(camera2!!.id), result)
-                            val timestamp = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS")
-                            timestamp.timeZone = TimeZone.getTimeZone("UTC")
-                            val photoFile = File(
-                                Paths.get(photoPath, "${timestamp.format(Date())}${RAW_EXT}")
-                                    .toUri()
-                            )
-                            timeToSaveImage = currentTimeMillis()
-                            try {
-                                FileOutputStream(photoFile).use {
-                                    dngCreator.writeByteBuffer(it, size, bytes, 0)
+                        if (RAW_MODE) {
+                            val (bytes, size) = image.use {
+                                Pair(cloneByteBuffer(it.planes[0].buffer), Size(it.width, it.height))
+                            }
+                            Log.d(TAG, "Time to copy Bytes: ${currentTimeMillis() - timeToProcessImage}ms")
+                            fileSavingExecutor.submit {
+                                val dngCreator =
+                                    DngCreator(cameraManager.getCameraCharacteristics(camera2!!.id), result)
+                                val timestamp = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS")
+                                timestamp.timeZone = TimeZone.getTimeZone("UTC")
+                                val photoFile = File(
+                                    Paths.get(photoPath, "${timestamp.format(Date())}${extension}")
+                                        .toUri()
+                                )
+                                timeToSaveImage = currentTimeMillis()
+                                try {
+                                    FileOutputStream(photoFile).use {
+                                        dngCreator.writeByteBuffer(it, size, bytes, 0)
+                                    }
+                                    Log.d(TAG, "Image Captured: ${photoFile.absolutePath}, time to save: ${currentTimeMillis() - timeToSaveImage}ms")
+                                } catch (ioex: IOException) {
+                                    Log.e(TAG, "Unable to write DNG image to file", ioex)
+                                } catch (iaex: IllegalArgumentException) {
+                                    Log.w(TAG, "Unable to write DNG image to file as no pixels available.", iaex)
                                 }
-                                Log.d(TAG, "Image Captured: ${photoFile.absolutePath}, time to save: ${currentTimeMillis() - timeToSaveImage}ms")
-                            } catch (ioex: IOException) {
-                                Log.e(TAG, "Unable to write DNG image to file", ioex)
-                            } catch (iaex: IllegalArgumentException) {
-                                Log.w(TAG, "Unable to write DNG image to file as no pixels available.", iaex)
+                            }
+                        } else {
+                            val bitmap = image.use { imageToBitmap(it) }
+                            fileSavingExecutor.submit {
+                                val timestamp = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS")
+                                timestamp.timeZone = TimeZone.getTimeZone("UTC")
+                                val photoFile = File(Paths.get(photoPath, "${timestamp.format(Date())}${extension}").toUri())
+                                timeToSaveImage = currentTimeMillis()
+                                try {
+                                    FileOutputStream(photoFile).use {
+                                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                                    }
+                                    Log.d(TAG, "Image Captured: ${photoFile.absolutePath}, time to save: ${currentTimeMillis() - timeToSaveImage}ms")
+                                } catch (ioex: IOException) {
+                                    Log.e(TAG, "Unable to write DNG image to file", ioex)
+                                } catch (iaex: IllegalArgumentException) {
+                                    Log.w(TAG, "Unable to write DNG image to file as no pixels available.", iaex)
+                                }
                             }
                         }
                         Log.d(TAG, "Time Taken To Process Image: ${currentTimeMillis() - timeToProcessImage}ms, time to prep Image: ${timeToSaveImage - timeToProcessImage}ms")
@@ -215,71 +200,17 @@ class CameraProcessor(private val appContext: Context): DataCollector {
         false
     }
 
-    @SuppressLint("MissingPermission")
-    private fun setupCameraXImages(lifecycleOwner: LifecycleOwner) {
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(appContext)
-
-        cameraProviderFuture.addListener({
-            // CameraProvider
-            val cameraProvider = cameraProviderFuture.get()
-
-            val cameraSelector = CameraSelector.Builder().build()
-
-            imageCapture = ImageCapture.Builder()
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                .setBufferFormat(ImageFormat.YUV_420_888)
-                .build()
-
-            camera = cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, imageCapture)
-            QualitySelector.from(Quality.HIGHEST)
-        }, ContextCompat.getMainExecutor(appContext))
-    }
-
-    private fun scheduleRepeatingCapture(capture: (timestamp: String) -> Unit) {
-        var timeLastPhotoTaken = currentTimeMillis()
-        repeatingImageCaptureTask = fixedRateTimer("ImageCapture", true, period = SAMPLE_RATE) {
-            val timestamp = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS");
-            timestamp.timeZone = TimeZone.getTimeZone("UTC");
-
-            capture(timestamp.format(Date()))
-            val timeCurrentImageTaken = currentTimeMillis()
-            Log.i(TAG, "time since last photo: ${timeCurrentImageTaken - timeLastPhotoTaken}ms")
-            timeLastPhotoTaken = timeCurrentImageTaken
-        }
-    }
-
-    private fun cameraXCapture(imageCapture: ImageCapture, timestamp: String, photoPath: String) {
-        val photoFile = File(Paths.get(photoPath, "${timestamp}${PNG_EXT}").toUri())
-
-        imageCapture.takePicture(executor, object : ImageCapture.OnImageCapturedCallback() {
-            override fun onError(exc: ImageCaptureException) {
-                Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
-            }
-
-            override fun onCaptureSuccess(imageProxy: ImageProxy) {
-                super.onCaptureSuccess(imageProxy)
-                val imageToBitmapTimestamp = currentTimeMillis()
-                val bitmap = imageToBitmap(imageProxy)
-                Log.i(TAG, "Time taken to convert image to bitmap: ${currentTimeMillis() - imageToBitmapTimestamp}ms")
-                FileOutputStream(photoFile).use {
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
-                }
-                Log.i(TAG, "Image Saved at: ${photoFile.absolutePath}")
-            }
-        })
-    }
-
     companion object {
         private const val IMAGES_DIR = "images"
         private const val PNG_EXT = ".png"
         private const val RAW_EXT = ".dng"
         private const val TAG = "CP"
-        private const val SAMPLE_RATE = (1000 / 30).toLong()
+        private const val SAMPLE_RATE = (1000 / 50).toLong()
         private const val IMAGE_BUFFER_SIZE: Int = 3
-        private const val CAMERAX_MODE = false
+        private const val RAW_MODE = true
 
         // Taken from https://stackoverflow.com/a/56812799
-        fun imageToBitmap(image: ImageProxy): Bitmap {
+        fun imageToBitmap(image: Image): Bitmap {
             val height = image.height
             val width = image.width
             val yBuffer = cloneByteBuffer(image.planes[0].buffer)

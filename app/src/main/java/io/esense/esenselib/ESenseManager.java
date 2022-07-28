@@ -100,6 +100,10 @@ public class ESenseManager {
         return (byte)(sum % 256);
     }
 
+    public BluetoothManager getBluetoothManager() {
+        return mBluetoothManager;
+    }
+
     /**
      * Checks the checksum at the given index from position (checkSumIndex + 1) until the end of the array
      * @param bytes array of bytes
@@ -403,7 +407,7 @@ public class ESenseManager {
         }
     }
 
-    public boolean connect(BluetoothDevice device, int timeout){
+    public boolean connect(BluetoothDevice device){
         try {
             Log.i(TAG, "Attempting to connect to bluetooth device: " + device.getName());
             mGatt = device.connectGatt(mContext, false, mGattCallback, BluetoothDevice.TRANSPORT_LE);

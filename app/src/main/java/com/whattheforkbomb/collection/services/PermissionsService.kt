@@ -1,63 +1,53 @@
 package com.whattheforkbomb.collection.services
 
-import android.Manifest
-import android.content.Context
+import android.app.Activity
 import android.content.pm.PackageManager
-import androidx.activity.result.contract.ActivityResultContracts
+import android.util.Log
 import androidx.core.app.ActivityCompat
+import java.util.concurrent.CountDownLatch
 
 /**
  * Service to ensure required permissions are obtained prior to attempting to interface with
  *  permission restricted hardware (camera and sensors)
  */
-class PermissionsService(private val context: Context) {
+class PermissionsService {
 
-    // check if permissions already retrieved
-    // obtain missing permissions
+    private val latch: CountDownLatch = CountDownLatch(1)
+    private val requiredPermissions: MutableMap<String, Boolean> = mutableMapOf()
 
-    /* Permissions
-     *  - Camera
-     *  - Location (For earables bluetooth connection)
-     */
+    fun checkOrGetPerms(activity: Activity): Boolean {
+        permissions.filter {
+            ActivityCompat.checkSelfPermission(activity.applicationContext, it) != PackageManager.PERMISSION_GRANTED
+        }.associateWith {
+            false
+        }.toMap(requiredPermissions)
 
-    // Convert to callbacks, can't return directly
-    fun checkOrGetPerms(permission: String): Boolean {
-        return if (ActivityCompat.checkSelfPermission(
-                context,
-                permission
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
-//            ActivityCompat.requestPermissions()
-            return true
+        return if (requiredPermissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(activity, requiredPermissions.keys.toTypedArray(), 1)
+            latch.await()
+            requiredPermissions.values.all { it }
         } else true
     }
 
-    // Register the permissions callback, which handles the user's response to the
-    // system permissions dialog. Save the return value, an instance of
-    // ActivityResultLauncher. You can use either a val, as shown in this snippet,
-    // or a lateinit var in your onAttach() or onCreate() method.
-//    val requestPermissionLauncher =
-//        registerForActivityResult(
-//            ActivityResultContracts.RequestPermission()
-//        ) { isGranted: Boolean ->
-//            if (isGranted) {
-//                // Permission is granted. Continue the action or workflow in your
-//                // app.
-//            } else {
-//                // Explain to the user that the feature is unavailable because the
-//                // features requires a permission that the user has denied. At the
-//                // same time, respect the user's decision. Don't link to system
-//                // settings in an effort to convince the user to change their
-//                // decision.
-//            }
-//        }
+    fun onPermsResult(permissions: Array<out String>, grantResults: IntArray) {
+        val results = permissions.toList().zip(grantResults.toList())
+        Log.i(TAG, results.joinToString())
+        results.forEach {
+            requiredPermissions[it.first] = (it.second == PackageManager.PERMISSION_GRANTED)
+        }
+        latch.countDown()
+    }
 
+    companion object {
+        private const val TAG = "PS"
+
+        private val permissions = listOf(
+            android.Manifest.permission.CAMERA,
+            android.Manifest.permission.BLUETOOTH_CONNECT,
+            android.Manifest.permission.BLUETOOTH_SCAN,
+            android.Manifest.permission.BLUETOOTH_ADVERTISE,
+            android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+        )
+    }
 
 }

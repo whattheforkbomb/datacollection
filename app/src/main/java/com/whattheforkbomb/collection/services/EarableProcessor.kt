@@ -1,43 +1,31 @@
 package com.whattheforkbomb.collection.services
 
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothGattCharacteristic
-import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.util.Log
 import com.whattheforkbomb.collection.data.ESenseEvent
-import io.esense.esenselib.*
+import io.esense.esenselib.ESenseConfig
+import io.esense.esenselib.ESenseConnectionListener
+import io.esense.esenselib.ESenseManager
 import java.io.File
 import java.io.FileWriter
 import java.nio.file.Paths
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
-
-class EarableProcessor(appContext: Context) : DataCollector {
+class EarableProcessor(private val appContext: Context) : DataCollector {
 
     @Volatile private var range = 0.0
     private var eSenseManager: ESenseManager? = null
     private var fileWriter: FileWriter? = null
     private var esenseConfig: ESenseConfig? = null
     @Volatile private var ready: Boolean = false
-    private val latch = CountDownLatch(1)
 
-    init {
-        val mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
-        val pairedDevices = mBluetoothAdapter.bondedDevices.toSet()
-
-        Log.i(TAG, "Bluetooth devices:\n${pairedDevices.joinToString(",") { it.name }}")
+    override fun setup(onReadyCallback: (setupSuccessful: Boolean) -> Unit) {
         val listener = object : ESenseConnectionListener {
-            //
-            override fun onDeviceFound(manager: ESenseManager) {
-                Log.i(TAG, "Device: $EARABLE_DEVICE_NAME found")
-            }
+            override fun onDeviceFound(manager: ESenseManager) {}
 
             override fun onDeviceNotFound(manager: ESenseManager) {
                 Log.e(TAG, "Unable to find device: $EARABLE_DEVICE_NAME")
                 ready = false
-                latch.countDown()
+                onReadyCallback(ready)
             }
 
             override fun onConnected(manager: ESenseManager) {
@@ -48,28 +36,25 @@ class EarableProcessor(appContext: Context) : DataCollector {
                 esenseConfig = config
                 eSenseManager = manager
                 ready = true
-                latch.countDown()
+                onReadyCallback(ready)
             }
 
             override fun onDisconnected(manager: ESenseManager) {
-                //
                 Log.i(TAG, "For some reason being disconnected")
+                onReadyCallback(ready)
             }
         }
+
         val manager = ESenseManager(EARABLE_DEVICE_NAME, appContext, listener)
+        val earableDevice = manager.bluetoothManager.adapter.bondedDevices.firstOrNull { EARABLE_DEVICE_NAME == it.name }
 
-        val pairedDevice = pairedDevices.firstOrNull { EARABLE_DEVICE_NAME == it.name }
-
-        if (pairedDevice != null ) {
-            manager.connect(pairedDevice, CONNECTION_TIMEOUT)
+        if (earableDevice != null ) {
+            // already connected to phone, try opening communication
+            manager.connect(earableDevice)
         } else {
+            // not already connected,
             manager.connect(CONNECTION_TIMEOUT)
         }
-    }
-
-    override fun setup(onReadyCallback: (setupSuccessful: Boolean) -> Unit) {
-        latch.await(9, TimeUnit.SECONDS)
-        onReadyCallback(ready)
     }
 
     override fun start(rootDir: String): Boolean {
@@ -82,6 +67,7 @@ class EarableProcessor(appContext: Context) : DataCollector {
         eSenseManager?.registerSensorListener({ eSenseEvent: ESenseEvent ->
             Log.i(TAG, "ESense Event received.")
             fw.appendLine(eSenseEvent.toCSV(esenseConfig!!))
+            fw.flush()
         }, SAMPLING_RATE)
 
         return true
@@ -98,27 +84,6 @@ class EarableProcessor(appContext: Context) : DataCollector {
         private const val EARABLE_DEVICE_NAME = "eSense-0467" //"eSense-1635"
         private const val FILE_NAME = "ESENSE_IMU_GYRO_DATA.csv"
         private const val CONNECTION_TIMEOUT = 60 * 1000 // 1min
-        private const val SAMPLING_RATE = 60 // 60 times a second / Hz
+        private const val SAMPLING_RATE = 50 // 60 times a second / Hz
     }
-}
-
-class EarableEventListener : ESenseEventListener {
-    override fun onBatteryRead(voltage: Double) {}
-    override fun onButtonEventChanged(pressed: Boolean) {}
-    override fun onAdvertisementAndConnectionIntervalRead(
-        minAdvertisementInterval: Int,
-        maxAdvertisementInterval: Int,
-        minConnectionInterval: Int,
-        maxConnectionInterval: Int
-    ) {
-    }
-
-    override fun onDeviceNameRead(deviceName: String) {}
-    override fun onSensorConfigRead(config: ESenseConfig) {
-        // accelerometer scale factor, needed for conversion of acceleration data in raw ADC format to m/s^2
-        val range = config.accSensitivityFactor
-//        println("range: $range")
-    }
-
-    override fun onAccelerometerOffsetRead(offsetX: Int, offsetY: Int, offsetZ: Int) {}
 }

@@ -91,6 +91,7 @@ class SensorProcessor(private val sensorManager: SensorManager) : DataCollector 
             val timestamp = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS")
             timestamp.timeZone = TimeZone.getTimeZone("UTC")
             fw.appendLine(data.toCSV(timestamp.format(Date())))
+            fw.flush()
         }
         if (timer == null) {
             timer = fixedRateTimer("PushLatestPosData", true, 0L, (SAMPLING_RATE/1000).toLong(), timerTask)
@@ -109,6 +110,6 @@ class SensorProcessor(private val sensorManager: SensorManager) : DataCollector 
     companion object {
         const val TAG = "SP"
         const val FILE_NAME = "IMU_GYRO_DATA.csv"
-        private const val SAMPLING_RATE = (1e6/60).toInt() // 60 times a second (1/60) scaled to microseconds (1e6)
+        private const val SAMPLING_RATE = (1e6/50).toInt() // 60 times a second (1/60) scaled to microseconds (1e6)
     }
 }

@@ -121,6 +121,7 @@ class DataCollectionFragment : Fragment() {
         Log.i(TAG, "Motion: $selectedMotion")
         readyToRecord = model.dataCollectionService.ready
         if (!readyToRecord) executor.execute {
+
             model.dataCollectionService.setup {
                 activity!!.runOnUiThread {
                     readyToRecord = it

@@ -1,132 +1,156 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layout xmlns:android="http://schemas.android.com/apk/res/android">
-    <data>
-        <variable name="timeRemaining" type="com.whattheforkbomb.collection.data.TimeRemaining"/>
-    </data>
-    <LinearLayout
+<layout xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+<!--    <data>-->
+<!--&lt;!&ndash;        <variable name="timeRemaining" type="com.whattheforkbomb.collection.data.TimeRemaining"/>&ndash;&gt;-->
+<!--    </data>-->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_margin="5dp"
-        android:orientation="vertical">
-
-        <!--
-            Face Indicator
-            - Toggleable (visibility and function)
-        -->
-        <FrameLayout
+        android:layout_height="match_parent">
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="0.2"
-            android:id="@+id/face_indicator_placeholder">
-            <!--  Replace with fragment for showing face indicated  -->
-        </FrameLayout>
+            android:layout_height="match_parent"
+            android:layout_margin="10dp"
+            android:orientation="vertical">
 
-        <!--
-            Instructions
-        -->
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="0.7"
-            android:id="@+id/instructions_placeholder">
-            <!--  Replace with fragment for showing instructions  -->
+    <!--        &lt;!&ndash;-->
+    <!--            Face Indicator-->
+    <!--            - Toggleable (visibility and function)-->
+    <!--        &ndash;&gt;-->
+    <!--        <FrameLayout-->
+    <!--            android:layout_width="match_parent"-->
+    <!--            android:layout_height="0dp"-->
+    <!--            android:layout_weight="0.2"-->
+    <!--            android:id="@+id/face_indicator_placeholder">-->
+    <!--            &lt;!&ndash;  Replace with fragment for showing face indicated  &ndash;&gt;-->
+    <!--        </FrameLayout>-->
+
             <!--
-                - Image carousel (slideshow of images showing action)
-                - scroll down for textual description
+                Instructions
             -->
-        </FrameLayout>
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="0.7"
+                android:id="@+id/instructions_placeholder">
+                <!--  Replace with fragment for showing instructions  -->
+                <!--
+                    - Image carousel (slideshow of images showing action)
+                    - scroll down for textual description
+                -->
+            </FrameLayout>
 
-        <!--
-            Timer
-        -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:orientation="horizontal"
-            android:gravity="center|bottom"
-            android:layout_weight="0.2">
+            <!--
+                Timer
+            -->
+<!--            <LinearLayout-->
+<!--                android:layout_width="match_parent"-->
+<!--                android:layout_height="0dp"-->
+<!--                android:orientation="horizontal"-->
+<!--                android:gravity="center|bottom"-->
+<!--                android:layout_weight="0.2">-->
+<!--                <LinearLayout-->
+<!--                    android:layout_width="wrap_content"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    android:orientation="vertical"-->
+<!--                    android:gravity="center"-->
+<!--                    android:layout_gravity="center|bottom">-->
+
+<!--                    <TextView-->
+<!--                        android:id="@+id/minutes"-->
+<!--                        android:layout_width="wrap_content"-->
+<!--                        android:layout_height="wrap_content"-->
+<!--                        android:layout_gravity="center"-->
+<!--                        android:text="@{String.valueOf(timeRemaining.minutes)}"-->
+<!--                        android:textAppearance="@style/TextAppearance.AppCompat.Display1" />-->
+<!--                    <TextView-->
+<!--                        android:layout_width="wrap_content"-->
+<!--                        android:layout_height="wrap_content"-->
+<!--                        android:layout_gravity="center"-->
+<!--                        android:text="Minutes">-->
+<!--                    </TextView>-->
+<!--                </LinearLayout>-->
+<!--                <TextView-->
+<!--                    android:layout_width="wrap_content"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    android:layout_marginBottom="10dp"-->
+<!--                    android:gravity="center_vertical"-->
+<!--                    android:padding="10dp"-->
+<!--                    android:text=":"-->
+<!--                    android:textAppearance="@style/TextAppearance.AppCompat.Display1" />-->
+<!--                <LinearLayout-->
+<!--                    android:layout_width="wrap_content"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    android:orientation="vertical"-->
+<!--                    android:gravity="center"-->
+<!--                    android:layout_gravity="center|bottom">-->
+
+<!--                    <TextView-->
+<!--                        android:id="@+id/seconds"-->
+<!--                        android:layout_width="wrap_content"-->
+<!--                        android:layout_height="wrap_content"-->
+<!--                        android:layout_gravity="center"-->
+<!--                        android:text="@{String.valueOf(timeRemaining.seconds)}"-->
+<!--                        android:textAppearance="@style/TextAppearance.AppCompat.Display1" />-->
+<!--                    <TextView-->
+<!--                        android:layout_width="wrap_content"-->
+<!--                        android:layout_height="wrap_content"-->
+<!--                        android:layout_gravity="center"-->
+<!--                        android:text="Seconds">-->
+<!--                    </TextView>-->
+<!--                </LinearLayout>-->
+<!--            </LinearLayout>-->
+
+            <!--
+                Buttons
+            -->
             <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
                 android:gravity="center"
-                android:layout_gravity="center|bottom">
+                android:layout_weight="0.2">
 
-                <TextView
-                    android:id="@+id/minutes"
+                <!-- Set enabled to variable binding -->
+                <Button
+                    android:id="@+id/button_play_pause"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:text="@{String.valueOf(timeRemaining.minutes)}"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Display1" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Minutes">
-                </TextView>
-            </LinearLayout>
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="10dp"
-                android:gravity="center_vertical"
-                android:padding="10dp"
-                android:text=":"
-                android:textAppearance="@style/TextAppearance.AppCompat.Display1" />
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:layout_gravity="center|bottom">
+                    android:layout_marginEnd="10dp"
+                    android:padding="0dip"
+                    android:text="@string/record"
+                    android:textAlignment="center"
+                    android:enabled="false"
+                    android:textSize="20sp"/>
 
-                <TextView
-                    android:id="@+id/seconds"
+                <Button
+                    android:id="@+id/button_next"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:text="@{String.valueOf(timeRemaining.seconds)}"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Display1" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="Seconds">
-                </TextView>
+                    android:enabled="false"
+                    android:text="@string/next" />
             </LinearLayout>
+
         </LinearLayout>
 
-        <!--
-            Buttons
-        -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:gravity="center"
-            android:layout_weight="0.2">
+        <ImageView
+            android:id="@+id/target"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:visibility="invisible"
+            app:srcCompat="@drawable/ic_baseline_fiber_manual_record_24" />
 
-            <!-- Set enabled to variable binding -->
-            <Button
-                android:id="@+id/button_play_pause"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_marginEnd="10dp"
-                android:padding="0dip"
-                android:text="@string/record"
-                android:textAlignment="center"
-                android:enabled="false"
-                android:textSize="20sp"/>
-
-            <Button
-                android:id="@+id/button_next"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:enabled="false"
-                android:text="@string/next" />
-        </LinearLayout>
-
-    </LinearLayout>
+        <ImageView
+            android:id="@+id/animatedTarget"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:scaleType="fitXY"
+            android:scaleX="1.0"
+            android:scaleY="1.0"
+            android:visibility="invisible"
+            app:srcCompat="@drawable/ic_baseline_fiber_manual_record_24" />
+    </FrameLayout>
 </layout>

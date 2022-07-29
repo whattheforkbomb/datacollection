@@ -46,10 +46,10 @@ class DataCollectionService private constructor(private val rootDir: Path, priva
      *   - Need Executor to setup (and run?) collectors
      */
 
-    fun start(motion: DataCollectionFragment.Companion.Motions) {
+    fun start(motion: DataCollectionFragment.Companion.Motions, gridPoint: DataCollectionFragment.Companion.GridPoints) {
         if (!running) {
             running = true
-            val path = Paths.get(filePath.pathString, motion.name)
+            val path = Paths.get(filePath.pathString, motion.name, gridPoint.name)
             path.toFile().mkdirs()
             dataCollectors.parallelStream().forEach { it.start(path.pathString) } // need parallel?
         } else {

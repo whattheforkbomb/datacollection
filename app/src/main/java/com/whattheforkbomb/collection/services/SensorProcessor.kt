@@ -37,6 +37,8 @@ class SensorProcessor(private val sensorManager: SensorManager) : DataCollector 
     @Volatile private var rawAccelerationVector: FloatArray = FloatArray(6) { 0f }
     @Volatile private var rawGyroVector: FloatArray = FloatArray(6) { 0f }
 
+    @Volatile private var closing = false
+
     private var timer: Timer? = null
 
     private fun registerListener(assignValue: (values: FloatArray) -> Unit, sensor: Sensor): Boolean {
@@ -74,36 +76,67 @@ class SensorProcessor(private val sensorManager: SensorManager) : DataCollector 
     }
 
     override fun start(rootDir: String): Boolean {
+        closing = false
         val csvFile = File(Paths.get(rootDir, FILE_NAME).toUri())
         csvFile.createNewFile()
         val fw = FileWriter(csvFile)
         fw.appendLine(PhonePositionalData.HEADER)
         fileWriter = fw
         val timerTask: TimerTask.() -> Unit = {
-            val data = PhonePositionalData(
-                LinearAccelerationVector(linearAccelerationVector[0], linearAccelerationVector[1], linearAccelerationVector[2]),
-                RotationVector(rotationVector[0], rotationVector[1], rotationVector[2], rotationVector[3]),
-                AccelerometerVector(accelerationVector[0], accelerationVector[1], accelerationVector[2]),
-                GyroscopeVector(gyroVector[0], gyroVector[1], gyroVector[2]),
-                RawAccelerometerVectors(Vector3D(rawAccelerationVector[0], rawAccelerationVector[1], rawAccelerationVector[2]), Vector3D(rawAccelerationVector[3], rawAccelerationVector[4], rawAccelerationVector[5])),
-                RawGyroscopeVectors(Vector3D(rawGyroVector[0], rawGyroVector[1], rawGyroVector[2]), Vector3D(rawGyroVector[3], rawGyroVector[4], rawGyroVector[5])),
-            )
-            val timestamp = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS")
-            timestamp.timeZone = TimeZone.getTimeZone("UTC")
-            fw.appendLine(data.toCSV(timestamp.format(Date())))
-            fw.flush()
+            if (!closing) {
+                val data = PhonePositionalData(
+                    LinearAccelerationVector(
+                        linearAccelerationVector[0],
+                        linearAccelerationVector[1],
+                        linearAccelerationVector[2]
+                    ),
+                    RotationVector(
+                        rotationVector[0],
+                        rotationVector[1],
+                        rotationVector[2],
+                        rotationVector[3]
+                    ),
+                    AccelerometerVector(
+                        accelerationVector[0],
+                        accelerationVector[1],
+                        accelerationVector[2]
+                    ),
+                    GyroscopeVector(gyroVector[0], gyroVector[1], gyroVector[2]),
+                    RawAccelerometerVectors(
+                        Vector3D(
+                            rawAccelerationVector[0],
+                            rawAccelerationVector[1],
+                            rawAccelerationVector[2]
+                        ),
+                        Vector3D(
+                            rawAccelerationVector[3],
+                            rawAccelerationVector[4],
+                            rawAccelerationVector[5]
+                        )
+                    ),
+                    RawGyroscopeVectors(
+                        Vector3D(
+                            rawGyroVector[0],
+                            rawGyroVector[1],
+                            rawGyroVector[2]
+                        ), Vector3D(rawGyroVector[3], rawGyroVector[4], rawGyroVector[5])
+                    ),
+                )
+                val timestamp = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS")
+                timestamp.timeZone = TimeZone.getTimeZone("UTC")
+                fw.appendLine(data.toCSV(timestamp.format(Date())))
+                fw.flush()
+            } else {
+                fileWriter?.close()
+            }
         }
-        if (timer == null) {
-            timer = fixedRateTimer("PushLatestPosData", true, 0L, (SAMPLING_RATE/1000).toLong(), timerTask)
-        } else {
-            timer!!.scheduleAtFixedRate(0L, (SAMPLING_RATE/1000).toLong(), timerTask)
-        }
+        timer = fixedRateTimer("PushLatestPosData", true, 0L, (SAMPLING_RATE/1000).toLong(), timerTask)
         return true
     }
 
     override fun stop(): Boolean {
+        closing = true
         timer?.cancel()
-        fileWriter?.close()
         return true
     }
 

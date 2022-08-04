@@ -1,17 +1,16 @@
 package com.whattheforkbomb.collection.fragments
 
-import android.graphics.ImageDecoder
-import android.graphics.drawable.AnimatedImageDrawable
-import androidx.lifecycle.ViewModelProvider
 import android.os.Bundle
 import android.util.Log
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
+import android.view.View.INVISIBLE
+import android.view.View.VISIBLE
 import android.view.ViewGroup
 import com.whattheforkbomb.collection.R
+import com.whattheforkbomb.collection.data.Instructions
 import com.whattheforkbomb.collection.databinding.FragmentInstructionsViewBinding
-import com.whattheforkbomb.collection.viewmodels.DataCollectionViewModel
 
 class InstructionsView : Fragment() {
 
@@ -22,23 +21,35 @@ class InstructionsView : Fragment() {
     // onDestroyView.
     private val binding get() = _binding!!
 
-    private lateinit var selectedMotion: DataCollectionFragment.Companion.Motions
+    private lateinit var instruction: Instructions
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        selectedMotion = arguments?.let {
-            it.get(resources.getString(R.string.motion_arg_name)) as DataCollectionFragment.Companion.Motions
-        } ?: DataCollectionFragment.DEFAULT_MOTION
-        Log.i(TAG, "Loading instructions for $selectedMotion")
+        instruction = arguments!![resources.getString(R.string.motion_arg_name)] as Instructions
+        Log.i(TAG, "Loading instructions for $instruction")
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val drawable = ImageDecoder.decodeDrawable(ImageDecoder.createSource(resources, selectedMotion.instructionGraphicPath)) as AnimatedImageDrawable
-        drawable.start()
-        binding.image.setImageDrawable(drawable)
-        binding.text.text = getString(selectedMotion.instructionsTextId)
+        binding.direction.setImageResource(instruction.directionId)
+        binding.video.setVideoPath("android.resource://${activity!!.packageName}/${instruction.videoId}")
+        binding.video.start()
+        binding.video.setOnPreparedListener { it.isLooping = true }
+        binding.instructionsText.text = instruction.instructionText
+        binding.guideText.setText(instruction.alignmentGuideTextId)
+        binding.imageGuide.setImageResource(instruction.alignmentGuideImageId)
+
+        binding.openGuide.setOnClickListener {
+            binding.instructions.visibility = INVISIBLE
+            binding.alignmentGuide.visibility = VISIBLE
+            Log.i(TAG, "Displaying the alignment guide.")
+        }
+        binding.closeGuide.setOnClickListener {
+            binding.instructions.visibility = VISIBLE
+            binding.alignmentGuide.visibility = INVISIBLE
+            Log.i(TAG, "Displaying the instructions.")
+        }
     }
 
     override fun onCreateView(

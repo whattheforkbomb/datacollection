@@ -78,6 +78,9 @@ class SensorProcessor(private val sensorManager: SensorManager) : DataCollector 
     override fun start(rootDir: String): Boolean {
         closing = false
         val csvFile = File(Paths.get(rootDir, FILE_NAME).toUri())
+        if (csvFile.exists()) {
+            csvFile.delete()
+        }
         csvFile.createNewFile()
         val fw = FileWriter(csvFile)
         fw.appendLine(PhonePositionalData.HEADER)

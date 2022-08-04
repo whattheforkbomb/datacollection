@@ -63,6 +63,9 @@ class EarableProcessor(private val appContext: Context) : DataCollector {
         closing = false
         Log.i(TAG, "Starting ESense earable processor")
         val csvFile = File(Paths.get(rootDir, FILE_NAME).toUri())
+        if (csvFile.exists()) {
+            csvFile.delete()
+        }
         csvFile.createNewFile()
         val fw = FileWriter(csvFile)
         fw.appendLine(ESenseEvent.HEADER)

@@ -4,10 +4,19 @@ import android.os.Bundle
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
+import android.view.View.INVISIBLE
 import android.view.ViewGroup
+import androidx.fragment.app.activityViewModels
 import androidx.navigation.fragment.findNavController
 import com.whattheforkbomb.collection.R
+import com.whattheforkbomb.collection.data.ESenseEvent
 import com.whattheforkbomb.collection.databinding.FragmentFinalInstructionsBinding
+import com.whattheforkbomb.collection.services.EarableProcessor
+import com.whattheforkbomb.collection.viewmodels.DataCollectionViewModel
+import java.io.File
+import java.io.FileWriter
+import java.nio.file.Paths
+import kotlin.io.path.pathString
 
 /**
  * A simple [Fragment] subclass as the second destination in the navigation.
@@ -23,26 +32,48 @@ class FinalInstructions : Fragment() {
     // onDestroyView.
     private val binding get() = _binding!!
 
+    private val model: DataCollectionViewModel by activityViewModels()
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-
         _binding = FragmentFinalInstructionsBinding.inflate(inflater, container, false)
         return binding.root
-
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        activity!!.actionBar?.setDisplayHomeAsUpEnabled(false)
+
+        val csvFile = File(Paths.get(model.rootDir.pathString, CONSENT_CSV).toUri())
+        if (!csvFile.exists()) {
+            csvFile.createNewFile()
+            FileWriter(csvFile).use {
+                it.appendLine(HEADER)
+            }
+        }
+
         binding.buttonNext.setOnClickListener {
-            // TODO: Navigate to DataCollectionActivity (second stage)
+            FileWriter(csvFile, true).use {
+                it.appendLine("${model.dataCollectionService.getParticipantId()},${binding.checkbox.isChecked}")
+            }
+            binding.buttonNext.isEnabled = false
+            binding.buttonNext.visibility = INVISIBLE
+            binding.textviewFirst.text = "Thank you for participating in the study. Please continue to debrief with a researcher."
+            binding.checkbox.isEnabled = false
+            binding.checkbox.visibility = INVISIBLE
         }
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+
+    companion object {
+        const val CONSENT_CSV = "consent.csv"
+        const val HEADER = "PARTICIPANT_ID,CONSENT_PROVIDED"
     }
 }

@@ -16,20 +16,48 @@
                 <ScrollView
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
-                    android:layout_weight="0.8">
-                    <TextView
-                        android:id="@+id/textview_first"
-                        android:layout_width="wrap_content"
+                    android:layout_weight="0.8"
+                    android:layout_marginBottom="5dp"
+                    android:scrollbarAlwaysDrawVerticalTrack="true"
+                    android:fadeScrollbars="false">
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
-                        android:text="@string/initial_instructions"/>
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="DISCLAIMER"
+                            android:textSize="24sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:id="@+id/disclaimer"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="5dp"
+                            android:textSize="20sp" />
+                        <View style="@style/Divider" android:layout_marginVertical="5dp"/>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Instructions"
+                            android:textSize="24sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:id="@+id/textview_first"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="16dp"
+                            android:text="@string/initial_instructions"
+                            android:textSize="20sp" />
+                    </LinearLayout>
                 </ScrollView>
         <Button
             android:id="@+id/button_next"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center|bottom"
-            android:text="@string/next" />
+            android:text="@string/begin" />
     </LinearLayout>
 
 </LinearLayout>

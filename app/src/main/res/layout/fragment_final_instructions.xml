@@ -17,18 +17,27 @@
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="0.8">
+
             <TextView
                 android:id="@+id/textview_first"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/initial_instructions"/>
+                android:text="@string/final_instructions"
+                android:textSize="20sp" />
         </ScrollView>
+
+        <CheckBox
+            android:id="@+id/checkbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.15"
+            android:text="@string/final_consent"
+            android:textSize="20sp" />
         <Button
             android:id="@+id/button_next"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center|bottom"
-            android:text="@string/next" />
+            android:text="@string/exit_label" />
     </LinearLayout>
 </LinearLayout>

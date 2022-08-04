@@ -1,15 +1,18 @@
 package com.whattheforkbomb.collection.fragments
 
-import android.content.Context
+import android.graphics.Typeface
 import android.os.Bundle
-import androidx.fragment.app.Fragment
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.StyleSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.LifecycleObserver
 import androidx.navigation.fragment.findNavController
+import androidx.navigation.ui.AppBarConfiguration
+import androidx.navigation.ui.NavigationUI.setupActionBarWithNavController
 import com.whattheforkbomb.collection.R
 import com.whattheforkbomb.collection.databinding.FragmentInitialInstructionsBinding
 import com.whattheforkbomb.collection.viewmodels.DataCollectionViewModel
@@ -41,12 +44,17 @@ class InitialInstructions : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        activity!!.actionBar?.setDisplayHomeAsUpEnabled(false)
+        activity!!.actionBar?.setHomeButtonEnabled(false)
+
         binding.buttonNext.setOnClickListener {
-//            val intent = Intent(activity, DataCollectionActivity::class.java)
-//            startActivity(intent)
             findNavController().navigate(R.id.nav_to_stage_1_data_collection)
         }
-        binding.textviewFirst.text = "Participant ID: ${model.dataCollectionService.getParticipantId()}"
+        val styledText = SpannableString(getString(R.string.disclaimer))
+        styledText.setSpan(StyleSpan(Typeface.BOLD_ITALIC), 91, 104, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        styledText.setSpan(StyleSpan(Typeface.BOLD_ITALIC), 120, 129, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        binding.disclaimer.text = styledText
+        activity!!.title = "Welcome"
     }
 
     override fun onDestroyView() {

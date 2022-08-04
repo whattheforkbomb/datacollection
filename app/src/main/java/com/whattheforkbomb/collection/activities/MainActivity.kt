@@ -4,6 +4,7 @@ import android.content.Context
 import android.hardware.SensorManager
 import android.os.Bundle
 import android.util.Log
+import android.view.View.INVISIBLE
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -26,6 +27,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val filePath = applicationContext.getExternalFilesDir(null)!!.toPath()
+        model.rootDir = filePath
         model.dataCollectionService = DataCollectionService.Builder(filePath, this)
             .registerDataCollector(CameraProcessor(applicationContext))
             .registerDataCollector(SensorProcessor(getSystemService(Context.SENSOR_SERVICE) as SensorManager))
@@ -36,9 +38,13 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         setSupportActionBar(binding.toolbar)
+        actionBar?.setDisplayHomeAsUpEnabled(false)
 
         val navController = findNavController(R.id.nav_host_fragment_content_main)
-        appBarConfiguration = AppBarConfiguration(navController.graph)
+//        appBarConfiguration = AppBarConfiguration(navController.graph)
+        appBarConfiguration = AppBarConfiguration(setOf(
+            R.id.Researcher, R.id.Welcome, R.id.Collection, R.id.Finish
+        ))
         setupActionBarWithNavController(navController, appBarConfiguration)
     }
 

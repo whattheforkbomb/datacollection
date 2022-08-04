@@ -1,27 +1,113 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    tools:context=".fragments.InstructionsView"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
-    <LinearLayout
+    <RelativeLayout
+        android:id="@+id/instructions"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        tools:context=".fragments.InstructionsView"
-        android:orientation="vertical">
+        android:layout_height="match_parent"
+        android:visibility="visible">
+        <LinearLayout
+            android:id="@+id/directionCon"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="horizontal"
+            android:layout_marginBottom="10dp"
+            android:layout_alignParentTop="true">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="10dp"
+                android:layout_marginEnd="5dp"
+                android:text="Motion Direction: "
+                android:textSize="30sp" />
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:scaleType="fitXY"
+                android:scaleX="2"
+                android:scaleY="2"
+                android:adjustViewBounds="true"
+                android:id="@+id/direction"/>
+        </LinearLayout>
 
-        <ImageView
-            android:id="@+id/image"
-            android:layout_width="wrap_content"
+        <VideoView
+            android:id="@+id/video"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:adjustViewBounds="true"
             android:cropToPadding="false"
             android:scaleType="fitCenter"
-            android:layout_marginEnd="10dip"/>
+            android:layout_marginBottom="10dp"
+            android:layout_below="@id/directionCon"/>
 
-        <TextView
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:id="@+id/text"/>
+            android:layout_height="match_parent"
+            android:layout_below="@id/video"
+            android:layout_alignParentBottom="true"
+            android:id="@+id/instructionsCon">
 
-    </LinearLayout>
-</ScrollView>
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/openGuide"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|end"
+                android:layout_margin="2dp"
+                android:alpha="0.5"
+                android:src="@android:drawable/ic_menu_help" />
+            <TextView
+                android:id="@+id/instructionsText"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:autoSizeMaxTextSize="60sp"
+                android:autoSizeMinTextSize="12sp"
+                android:autoSizeStepGranularity="2sp"
+                android:autoSizeTextType="uniform" />
+        </FrameLayout>
+    </RelativeLayout>
+    <FrameLayout
+        android:id="@+id/alignmentGuide"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="invisible">
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/closeGuide"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:alpha="0.5"
+            android:src="@android:drawable/ic_menu_close_clear_cancel" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fadeScrollbars="false"
+            android:scrollbarAlwaysDrawVerticalTrack="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/imageGuide"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:adjustViewBounds="true"/>
+
+                <TextView
+                    android:id="@+id/guideText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="30sp" />
+            </LinearLayout>
+        </ScrollView>
+    </FrameLayout>
+</FrameLayout>

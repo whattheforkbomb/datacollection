@@ -1,36 +1,39 @@
 package com.whattheforkbomb.collection.fragments
 
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
 import android.os.CountDownTimer
-import android.transition.Visibility
 import android.util.Log
-import android.util.Size
 import android.view.Gravity
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
+import android.view.View.INVISIBLE
+import android.view.View.VISIBLE
 import android.view.ViewGroup
-import android.view.animation.Animation
 import android.widget.FrameLayout
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.core.os.bundleOf
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.commit
 import androidx.fragment.app.replace
 import androidx.navigation.fragment.findNavController
 import com.whattheforkbomb.collection.R
+import com.whattheforkbomb.collection.data.Instructions
 import com.whattheforkbomb.collection.data.TimeRemaining
 import com.whattheforkbomb.collection.databinding.FragmentDataCollectionBinding
-import com.whattheforkbomb.collection.services.CameraProcessor
-import com.whattheforkbomb.collection.services.SensorProcessor
 import com.whattheforkbomb.collection.viewmodels.DataCollectionViewModel
 import java.util.*
 import java.util.concurrent.Executor
-import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import java.util.stream.Collectors.toList
 import kotlin.concurrent.fixedRateTimer
+import kotlin.math.ceil
+import kotlin.math.sqrt
 
 /**
  * A simple [Fragment] subclass.
@@ -38,120 +41,241 @@ import kotlin.concurrent.fixedRateTimer
  * create an instance of this fragment.
  */
 class DataCollectionFragment : Fragment() {
-    private val TAG = "DC"
     private var _binding: FragmentDataCollectionBinding? = null
 
     // This property is only valid between onCreateView and
     // onDestroyView.
     private val binding get() = _binding!!
+    private var repetitions = 0
 
     private val model: DataCollectionViewModel by activityViewModels()
     private val executor: Executor = Executors.newSingleThreadExecutor()
 
+    private var previousGridPoints: List<Pair<GridPoints, Instructions>> = listOf()
     private var selectedMotion: Motions = DEFAULT_MOTION
-    private var remainingGridPoints: List<GridPoints> = listOf()
+    private var remainingGridPoints: List<Pair<GridPoints, Instructions>> = listOf()
     private var faceDetectionEnabled: Boolean = false
     private var recording = false
+    private lateinit var timer: CountDownTimer
     @Volatile private var animationTimer: Timer? = null
+    @Volatile private var pendingShake = false
     private var readyToRecord: Boolean = false // Replace with variable binding from fragment
         set(value) {
             if (value && !binding.buttonNext.isEnabled) {
-                binding.buttonPlayPause.isEnabled = true
+                // Need some indicator that ready to record?
             }
             field = value
         }
 
+    private val shakeDetector = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent?) {
+            if (pendingShake && shakeDetected(event!!.values)) {
+                pendingShake = false
+                startRecording()
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}// N/A
+    }
+
+    private lateinit var sensorManager: SensorManager
+    private lateinit var accelerometerSensor: Sensor
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         faceDetectionEnabled = arguments?.getBoolean(resources.getString(R.string.face_detection)) ?: false
+        val onBackCallback = object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (!recording) {
+                    Log.i(TAG, "Remaining: ${remainingGridPoints.size}, Previous: ${previousGridPoints.size}")
+                    if (remainingGridPoints.size < previousGridPoints.size) {
+                        binding.progress.progress = binding.progress.progress - 1
+                        remainingGridPoints = previousGridPoints.subList(previousGridPoints.size - remainingGridPoints.size - 1 , previousGridPoints.size)
+                        binding.buttonNext.isEnabled = false
+                        binding.buttonNext.text = "Wait"
+                        val layoutParams = FrameLayout.LayoutParams(binding.target.layoutParams)
+                        layoutParams.gravity = remainingGridPoints[0].first.layoutGravity
+                        binding.target.layoutParams = layoutParams
+                        binding.target.visibility = VISIBLE
+
+                        if (remainingGridPoints[0].first.animated) setAnimation(remainingGridPoints[0].first)
+
+                        Log.i(TAG, "Current Target Position: ${remainingGridPoints[0]} - ${remainingGridPoints[0].first.layoutGravity}")
+                        parentFragmentManager.commit {
+                            val bundle = bundleOf(getString(R.string.motion_arg_name) to remainingGridPoints[0].second)
+                            replace<InstructionsView>(R.id.instructions_placeholder, args = bundle)
+                        }
+                    } else {
+                        val previousMotion = Motions.values().singleOrNull {
+                            it.getNext() == selectedMotion
+                        }
+                        if (previousMotion != null) {
+                            animationTimer?.cancel()
+                            animationTimer = null
+                            binding.animatedTarget.visibility = INVISIBLE
+                            reset(previousMotion)
+                        }
+                    }
+                }
+            }
+        }
+        requireActivity().onBackPressedDispatcher.addCallback(this, onBackCallback);
     }
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?,savedInstanceState: Bundle?): View {
         // Inflate the layout for this fragment
         _binding = FragmentDataCollectionBinding.inflate(inflater, container, false)
+        activity!!.actionBar?.title = "Data Collection"
         return binding.root
     }
 
-    private fun reset(motion: Motions) {
+    private fun reset(motion: Motions, reverse: Boolean = false) {
+        binding.timer.visibility = INVISIBLE
+        binding.recordingState.text = "PENDING SHAKE"
+        binding.recordingState.visibility = VISIBLE
         selectedMotion = motion
-        remainingGridPoints = selectedMotion.getTargets().shuffled()
+        binding.target.scaleX = 1.0F
+        binding.target.scaleY = 1.0F
+        binding.target.visibility = VISIBLE
+        activity!!.title = "Data Collection Stage ${selectedMotion.ordinal+1}/${Motions.values().size} - Attempt ${repetitions+1}/5"
+        remainingGridPoints = selectedMotion.getTargets()
+        previousGridPoints = remainingGridPoints.toList()
+        binding.progress.min = 0
+        binding.progress.max = remainingGridPoints.size
+        binding.progress.progress = 0
+        if (reverse) {
+            binding.progress.progress = remainingGridPoints.size - 1
+            remainingGridPoints = listOf(remainingGridPoints.last())
+        }
+
+        sensorManager.registerListener(shakeDetector, accelerometerSensor, SensorManager.SENSOR_DELAY_UI)
 
         Log.i(TAG, "Remaining GridPoints: ${remainingGridPoints.joinToString()}")
 
         parentFragmentManager.commit {
-            val bundle = bundleOf(getString(R.string.motion_arg_name) to selectedMotion)
+            val bundle = bundleOf(getString(R.string.motion_arg_name) to remainingGridPoints[0].second)
             replace<InstructionsView>(R.id.instructions_placeholder, args = bundle)
         }
 
-//        if (faceDetectionEnabled) parentFragmentManager.commit {
-//            replace<FaceIndicator>(R.id.face_indicator_placeholder)
-//        }
-
         val layoutParams = FrameLayout.LayoutParams(binding.target.layoutParams)
-        layoutParams.gravity = remainingGridPoints[0].layoutGravity
-        Log.i(TAG, "Current Target Position: ${remainingGridPoints[0].name} - ${remainingGridPoints[0].layoutGravity}")
+        layoutParams.gravity = remainingGridPoints[0].first.layoutGravity
+        Log.i(TAG, "Current Target Position: ${remainingGridPoints[0].first.name} - ${remainingGridPoints[0].first.layoutGravity}")
         binding.target.layoutParams = layoutParams
 
-        if (remainingGridPoints[0].animated) setAnimation(remainingGridPoints[0])
+        if (remainingGridPoints[0].first.animated) setAnimation(remainingGridPoints[0].first)
 
         // Nav
         binding.buttonNext.setOnClickListener {
-            if (remainingGridPoints.size == 1) {
-                val nextMotion = selectedMotion.getNext()
-                if (nextMotion != null) {
-                    reset(nextMotion)
-                } else {
-                    findNavController().navigate(R.id.nav_to_stage_2_instructions)
-                }
-                animationTimer?.cancel()
-                animationTimer = null
-                binding.animatedTarget.visibility = View.INVISIBLE
-            } else {
-                remainingGridPoints = remainingGridPoints.subList(1, remainingGridPoints.size)
-                binding.buttonNext.isEnabled = false
-                layoutParams.gravity = remainingGridPoints[0].layoutGravity
-                binding.target.layoutParams = layoutParams
-                binding.target.visibility = View.VISIBLE
-
-                if (remainingGridPoints[0].animated) setAnimation(remainingGridPoints[0])
-
-                Log.i(TAG, "Current Target Position: ${remainingGridPoints[0]} - ${remainingGridPoints[0].layoutGravity}")
-            }
+            timer.cancel()
+            nextMotion()
         }
 
-        binding.buttonPlayPause.isEnabled = readyToRecord
-        binding.buttonPlayPause.text = getString(R.string.record)
-        binding.buttonNext.isEnabled = false
         recording = false
+    }
 
-        binding.buttonPlayPause.setOnClickListener {
-            if (recording) {
-                recording = false
-
-                model.dataCollectionService.stop()
-                binding.buttonNext.isEnabled = true
-
-                binding.buttonPlayPause.text = getString(R.string.record)
-                binding.target.visibility = View.INVISIBLE
+    private fun nextMotion() {
+        binding.buttonNext.isEnabled = false
+        binding.buttonNext.text = "Wait"
+        recording=false
+        model.dataCollectionService.stop()
+        binding.progress.progress = binding.progress.progress + 1
+        pendingShake = true
+        binding.target.scaleX = 1.0F
+        binding.target.scaleY = 1.0F
+        if (remainingGridPoints.size == 1) {
+            val nextMotion = selectedMotion.getNext()
+            animationTimer?.cancel()
+            animationTimer = null
+            binding.animatedTarget.visibility = INVISIBLE
+            if (nextMotion != null) {
+                reset(nextMotion)
+            } else if(repetitions < 5) {
+                repetitions++
+                reset(DEFAULT_MOTION)
             } else {
-                recording = true
-
-                model.dataCollectionService.start(selectedMotion, remainingGridPoints[0])
-
-                binding.buttonPlayPause.text = getString(R.string.pause)
-                binding.target.visibility = View.VISIBLE
+                findNavController().navigate(R.id.nav_to_finish)
             }
+        } else {
+            val layoutParams = FrameLayout.LayoutParams(binding.target.layoutParams)
+            binding.timer.visibility = INVISIBLE
+            binding.recordingState.text = "PENDING SHAKE"
+            binding.recordingState.visibility = VISIBLE
+            remainingGridPoints = remainingGridPoints.subList(1, remainingGridPoints.size)
+
+            layoutParams.gravity = remainingGridPoints[0].first.layoutGravity
+            binding.target.layoutParams = layoutParams
+            binding.target.visibility = VISIBLE
+
+            if (remainingGridPoints[0].first.animated) setAnimation(remainingGridPoints[0].first)
+
+            parentFragmentManager.commit {
+                val bundle = bundleOf(getString(R.string.motion_arg_name) to remainingGridPoints[0].second)
+                replace<InstructionsView>(R.id.instructions_placeholder, args = bundle)
+            }
+            Log.i(TAG, "Current Target Position: ${remainingGridPoints[0].first} - ${remainingGridPoints[0].first.layoutGravity}")
         }
     }
 
+    private fun startRecording() {
+        binding.timer.visibility = VISIBLE
+        binding.recordingState.visibility = INVISIBLE
+        getTimer(3) {
+            binding.timer.visibility = INVISIBLE
+            binding.recordingState.visibility = VISIBLE
+            binding.recordingState.text = "RECORDING"
+            recording = true
+            model.dataCollectionService.start(repetitions, selectedMotion, remainingGridPoints[0].first)
+            timer = getTimer(2) {
+                binding.buttonNext.isEnabled = true
+                binding.buttonNext.text = "Stop Recording"
+                timer = getTimer(8) {
+                    Toast.makeText(
+                        activity!!.applicationContext,
+                        "Recording Stopped Automatically As Over 10 Seconds Had Elapsed.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    nextMotion()
+                }
+                timer.start()
+            }
+
+            timer.start()
+        }.start()
+    }
+
+    private fun getTimer(sec: Long, onFinishCallback: () -> Unit): CountDownTimer {
+        binding.timeRemaining = TimeRemaining(0, sec)
+        return object : CountDownTimer((sec * 1000), 200) {
+            override fun onTick(millisUntilFinished: Long) {
+//                Log.i(TAG, "Time Remaining (ms): $millisUntilFinished")
+                binding.timeRemaining = TimeRemaining(0, ceil(millisUntilFinished / 1000.0).toLong())
+            }
+
+            override fun onFinish() = onFinishCallback()
+        }
+    }
+
+    private fun shakeDetected(acceleration: FloatArray): Boolean {
+        // https://jasonmcreynolds.com/?p=388
+        val x = acceleration[0]
+        val y = acceleration[1]
+        val z = acceleration[2]
+
+        val  gX = x / SensorManager.GRAVITY_EARTH
+        val  gY = y / SensorManager.GRAVITY_EARTH
+        val  gZ = z / SensorManager.GRAVITY_EARTH
+
+        // gForce will be close to 1 when there is no movement.
+        val gForce = sqrt(gX * gX + gY * gY + gZ * gZ)
+
+        return gForce > SHAKE_THRESHOLD
+    }
+
     private fun setAnimation(gridPoints: GridPoints) {
-        binding.animatedTarget.visibility = View.VISIBLE
         animationTimer?.cancel()
         when(gridPoints) {
             GridPoints.ZOOM_IN -> {
+                binding.target.visibility = INVISIBLE
                 val maxScale = 3.0
                 animationTimer = fixedRateTimer("AnimationTimer", true, 0L, (400).toLong()) {
                     val newScale = binding.target.scaleX + 0.5
@@ -170,6 +294,7 @@ class DataCollectionFragment : Fragment() {
             }
 
             GridPoints.ZOOM_OUT -> {
+                binding.target.visibility = INVISIBLE
                 val maxScale = 3.0
                 animationTimer = fixedRateTimer("AnimationTimer", true, 0L, (400).toLong()) {
                     val newScale = binding.target.scaleX - 0.5
@@ -188,6 +313,7 @@ class DataCollectionFragment : Fragment() {
             }
 
             GridPoints.CLOCKWISE -> {
+                binding.animatedTarget.visibility = VISIBLE
                 val positions = POINTING_GRID_POINTS
                 var currentIdx = 0
                 val layoutParams =  FrameLayout.LayoutParams(binding.animatedTarget.layoutParams)
@@ -204,6 +330,7 @@ class DataCollectionFragment : Fragment() {
             }
 
             GridPoints.ANTI_CLOCKWISE -> {
+                binding.animatedTarget.visibility = VISIBLE
                 val positions = POINTING_GRID_POINTS.reversed()
                 var currentIdx = 0
                 val layoutParams =  FrameLayout.LayoutParams(binding.animatedTarget.layoutParams)
@@ -220,100 +347,164 @@ class DataCollectionFragment : Fragment() {
             }
 
             else -> {
-                Log.e(TAG, "There should be no animation for this")
+                Log.e(Companion.TAG, "There should be no animation for this")
             }
         }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        activity!!.actionBar?.setDisplayHomeAsUpEnabled(false)
         Log.i(TAG, "Motion: $selectedMotion")
         readyToRecord = model.dataCollectionService.ready
+        binding.timeRemaining = TimeRemaining(0, 0)
         if (!readyToRecord) executor.execute {
-
             model.dataCollectionService.setup {
+                pendingShake = true
                 activity!!.runOnUiThread {
                     readyToRecord = it
-                    if (!it) {
-                        val toast = Toast.makeText(
+                    val toast = if (!it) {
+                        Log.e(TAG, "Failed to start data collectors")
+                        Toast.makeText(
                             activity!!.applicationContext,
                             "Unable to successfully start data collectors... Please check logs and restart.",
                             Toast.LENGTH_LONG
                         )
-                        Log.e(TAG, "Failed to start data collectors")
-                        toast.show()
+                    } else {
+                        Toast.makeText(
+                            activity!!.applicationContext,
+                            "Ready to begin recording",
+                            Toast.LENGTH_LONG
+                        )
                     }
+                    toast.show()
                 }
             }
-        }
+        } else
+            pendingShake = true
+        sensorManager = activity!!.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        binding.buttonNext.isEnabled = false
+        binding.buttonNext.text = "Wait"
         reset(selectedMotion)
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
+        sensorManager.unregisterListener(shakeDetector)
         _binding = null
     }
 
     companion object {
-        enum class Motions(val instructionGraphicPath: Int, val instructionsTextId: Int) {
-            POINTING_TRANSLATE_PHONE(R.drawable.phonepointing, R.string.pointing_translate_phone_instructions) {
+        private const val SHAKE_THRESHOLD = 2.0
+
+        enum class Motions {
+            POINTING_TRANSLATE_PHONE {
                 override fun getNext() = POINTING_ROTATE_PHONE
-                override fun getTargets() = POINTING_GRID_POINTS
+                override fun getTargets() = POINTING_GRID_POINTS.zip(listOf(
+                    Instructions(R.raw.phone_translate_pointing_topcentre, R.drawable.direction_down, "${move("Down", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_translate_pointing_topright, R.drawable.direction_down_left, "${move("Up And To The Left", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_translate_pointing_midright, R.drawable.direction_left, "${move("Left", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_translate_pointing_bottomright, R.drawable.direction_up_left, "${move("Down And To The Left", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_translate_pointing_bottomcentre, R.drawable.direction_up, "${move("Up", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_translate_pointing_bottomleft, R.drawable.direction_up_right, "${move("Up And To The Right", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_translate_pointing_midleft, R.drawable.direction_right, "${move("Right", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_translate_pointing_topleft, R.drawable.direction_down_right, "${move("Down And To The Right", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                ))
             },
-            POINTING_ROTATE_PHONE(R.drawable.phonepointing, R.string.pointing_rotate_phone_instructions) {
+            POINTING_ROTATE_PHONE {
                 override fun getNext() = POINTING_ROTATE_HEAD
-                override fun getTargets() = POINTING_GRID_POINTS
+                override fun getTargets() = POINTING_GRID_POINTS.zip(listOf(
+                    Instructions(R.raw.phone_rotate_pointing_topcentre, R.drawable.direction_down, "${move("Towards Your Nose", "Turn The Top Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_rotate_pointing_topright, R.drawable.direction_down_left, "${move("Towards Your Nose", "Turn The Top Right Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_rotate_pointing_midright, R.drawable.direction_left, "${move("Towards Your Nose", "Turn The Right Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_rotate_pointing_bottomright, R.drawable.direction_up_left, "${move("Towards Your Nose", "Turn The Bottom Right Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_rotate_pointing_bottomcentre, R.drawable.direction_up, "${move("Towards Your Nose", "Turn The Bottom Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_rotate_pointing_bottomleft, R.drawable.direction_up_right, "${move("Towards Your Nose", "Turn The Bottom Left Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_rotate_pointing_midleft, R.drawable.direction_right, "${move("Towards Your Nose", "Turn The Left Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_rotate_pointing_topleft, R.drawable.direction_down_right, "${move("Towards Your Nose", "Turn The Top Left Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                ))
             },
-            POINTING_ROTATE_HEAD(R.drawable.phonepointing, R.string.pointing_rotate_head_instructions) {
+            POINTING_ROTATE_HEAD {
                 override fun getNext() = TRANSLATE_PHONE
-                override fun getTargets() = POINTING_GRID_POINTS
+                override fun getTargets() = POINTING_GRID_POINTS.zip(listOf(
+                    Instructions(R.raw.head_rotate_pointing_topcentre, R.drawable.direction_up, "${move("Towards The Top Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_rotate_pointing_topright, R.drawable.direction_up_right, "${move("Towards The Top Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_rotate_pointing_midright, R.drawable.direction_right, "${move("Towards The Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_rotate_pointing_bottomright, R.drawable.direction_down_right, "${move("Towards The Bottom Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_rotate_pointing_bottomcentre, R.drawable.direction_down, "${move("Towards The Bottom Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_rotate_pointing_bottomleft, R.drawable.direction_down_left, "${move("Towards The Bottom Left Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_rotate_pointing_midleft, R.drawable.direction_left, "${move("Towards The Left Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_rotate_pointing_topleft, R.drawable.direction_up_left, "${move("Towards The Top Left Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                ))
             },
-            TRANSLATE_PHONE(R.drawable.phonepointing, R.string.pointing_translate_phone_instructions) {
+            TRANSLATE_PHONE {
                 override fun getNext() = CIRCULAR_PHONE
-                override fun getTargets() = EDGE_GRID_POINTS.toList()
+                override fun getTargets() = EDGE_GRID_POINTS.zip(listOf(
+                    Instructions(R.raw.phone_translate_topcentre, R.drawable.direction_down, "${move("Down", "Move", true)}\n\n$TARGET_CHIN", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_translate_midright, R.drawable.direction_left, "${move("Left", "Move", true)}\n\n$TARGET_LEFT_EAR", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_translate_bottomcentre, R.drawable.direction_up, "${move("Up", "Move", true)}\n\n$TARGET_FOREHEAD", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_translate_midleft, R.drawable.direction_right, "${move("Right", "Move", true)}\n\n$TARGET_RIGHT_EAR", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                ))
             },
-            CIRCULAR_PHONE(R.drawable.phonepointing, R.string.circular_phone_instructions) {
+            CIRCULAR_PHONE {
                 // little and large circles?
                 override fun getNext() = CIRCULAR_HEAD
-                override fun getTargets() = ROLL_GRID_POINTS
+                override fun getTargets() = ROLL_GRID_POINTS.zip(listOf(
+                    Instructions(R.raw.phone_circular_clockwise, R.drawable.direction_clockwise, "${move("Clockwise In A Small Circle", "Move", true, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_circular_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise In A Small Circle", "Move", true, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_phone_instructions, R.drawable.facedetected),
+                ))
             },
-            CIRCULAR_HEAD(R.drawable.phonepointing, R.string.circular_head_instructions) {
+            CIRCULAR_HEAD {
                 override fun getNext() = ZOOM_PHONE
-                override fun getTargets() = ROLL_GRID_POINTS
+                override fun getTargets() = ROLL_GRID_POINTS.zip(listOf(
+                    Instructions(R.raw.head_circular_clockwise, R.drawable.direction_clockwise, "${move("Clockwise In A Small Circle", "While Keeping Your Body/Shoulders Still, Move", false, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_head_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_circular_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise In A Small Circle", "While Keeping Your Body/Shoulders Still, Move", false, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_head_instructions, R.drawable.facedetected),
+                ))
             },
-            ZOOM_PHONE(R.drawable.phonepointing, R.string.zoom_phone_instructions) {
-                // Need additional instruction to indicate direction to move phone
+            ZOOM_PHONE {
                 override fun getNext() = ZOOM_HEAD
-                override fun getTargets() = listOf(GridPoints.ZOOM_IN, GridPoints.ZOOM_OUT)
+                override fun getTargets() = listOf(GridPoints.ZOOM_IN, GridPoints.ZOOM_OUT).zip(listOf(
+                    Instructions(R.raw.phone_zoom_in, R.drawable.direction_zoom_in, "${move("Towards Your Face", "Move", true)}\n\n$TARGET_CENTRE", R.string.zoom_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_zoom_out, R.drawable.direction_zoom_out, "${move("Away From Your Face", "Move", true)}\n\n$TARGET_CENTRE", R.string.zoom_phone_instructions, R.drawable.facedetected),
+                ))
             },
-            ZOOM_HEAD(R.drawable.phonepointing, R.string.zoom_head_instructions) {
+            ZOOM_HEAD {
                 override fun getNext() = ROTATE_HEAD
-                override fun getTargets() = listOf(GridPoints.ZOOM_IN)
+                override fun getTargets() = listOf(GridPoints.ZOOM_IN, GridPoints.ZOOM_OUT).zip(listOf(
+                    Instructions(R.raw.head_zoom_in, R.drawable.direction_zoom_in, "${move("Towards The Phone", "Move", false)}\n\n$TARGET_CENTRE", R.string.zoom_head_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_zoom_out, R.drawable.direction_zoom_out, "${move("Away From The Phone", "Move", false)}\n\n$TARGET_CENTRE", R.string.zoom_head_instructions, R.drawable.facedetected),
+                ))
             },
-            ROTATE_HEAD(R.drawable.phonepointing, R.string.rotate_head_instructions) {
+            ROTATE_HEAD {
                 override fun getNext() = ROTATE_PHONE_ROLL
-                override fun getTargets() = EDGE_GRID_POINTS.toList()
+                override fun getTargets() = EDGE_GRID_POINTS.zip(listOf(
+                    Instructions(R.raw.head_rotate_topcentre, R.drawable.direction_up, "Look Up\n\nYour Nose Should Be Pointing Above The Top Of The Phone.", R.string.rotate_head_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_rotate_midright, R.drawable.direction_right, "Look Right\n\nYour Nose Should Be Pointing Beyond The Right Of The Phone.", R.string.rotate_head_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_rotate_bottomcentre, R.drawable.direction_left, "Look Down\n\nYour Nose Should Be Pointing Below The Bottom Of The Phone.", R.string.rotate_head_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_rotate_midleft, R.drawable.direction_down, "Look Left\n\nYour Nose Should Be Pointing Beyond The Left Of The Phone.", R.string.rotate_head_instructions, R.drawable.facedetected),
+                ))
             },
-            ROTATE_PHONE_ROLL(R.drawable.phonepointing, R.string.rotate_phone_roll_instructions) {
-                // Need additional instruction to indicate direction to move phone, maybe second target that circles the screen in direction?
+            ROTATE_PHONE_ROLL {
                 override fun getNext() = ROTATE_HEAD_ROLL
-                override fun getTargets() = ROLL_GRID_POINTS
+                override fun getTargets() = ROLL_GRID_POINTS.zip(listOf(
+                    Instructions(R.raw.phone_roll_clockwise, R.drawable.direction_clockwise, "${move("Clockwise", "Tilt", true)}\n\n$TARGET_CENTRE", R.string.rotate_phone_roll_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_roll_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise", "Tilt", true)}\n\n$TARGET_CENTRE", R.string.rotate_phone_roll_instructions, R.drawable.facedetected),
+                ))
             },
-            ROTATE_HEAD_ROLL(R.drawable.phonepointing, R.string.rotate_head_roll_instructions) {
-                // Need additional instruction to indicate direction to move head, maybe second target that circles the screen in direction?
-                override fun getNext() = ROTATE_PHONE_ORBIT
-                override fun getTargets() = ROLL_GRID_POINTS
-            },
-            ROTATE_PHONE_ORBIT(R.drawable.phonepointing, R.string.rotation_orbit_phone) {
+            ROTATE_HEAD_ROLL {
                 override fun getNext(): Motions? = null
-                override fun getTargets() = listOf(GridPoints.MID_LEFT, GridPoints.MID_RIGHT)
+                override fun getTargets() = ROLL_GRID_POINTS.zip(listOf(
+                    Instructions(R.raw.head_roll_clockwise, R.drawable.direction_clockwise, "${move("Clockwise", "Tilt", false)}\n\n$TARGET_CENTRE", R.string.rotate_head_roll_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_roll_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise", "false", true)}\n\n$TARGET_CENTRE", R.string.rotate_head_roll_instructions, R.drawable.facedetected),
+                ))
             };
 
             abstract fun getNext(): Motions?
-            abstract fun getTargets(): List<GridPoints>
-
+            abstract fun getTargets(): List<Pair<GridPoints, Instructions>>
         }
-        val DEFAULT_MOTION = Motions.CIRCULAR_PHONE //POINTING_TRANSLATE_PHONE
+
+        val DEFAULT_MOTION = Motions.POINTING_TRANSLATE_PHONE
 
         enum class GridPoints(val layoutGravity: Int, val animated: Boolean) {
             TOP_CENTRE(Gravity.TOP or Gravity.CENTER, false),
@@ -348,5 +539,21 @@ class DataCollectionFragment : Fragment() {
         )
         val ROLL_GRID_POINTS = listOf(GridPoints.CLOCKWISE, GridPoints.ANTI_CLOCKWISE)
 
+        private fun align(target: String) = "Align Target On Screen With Your $target"
+        val TARGET_NOSE = align("Nose")
+        val TARGET_LEFT_EAR =  align("Left Ear")
+        val TARGET_RIGHT_EAR =  align("Right Ear")
+        val TARGET_CHIN =  align("Chin")
+        val TARGET_FOREHEAD =  align("Forehead")
+        const val TARGET_CENTRE = "Keep Target On Screen Aligned With You Nose"
+        private fun move(direction: String, modifier: String, phone: Boolean, reverse: Boolean = true): String {
+            val (moving, stationary) = if (phone)
+                Pair("The Phone", "Your Head")
+            else
+                Pair("Your Head", "The Phone")
+            return "$modifier $moving $direction While Keeping $stationary Still.${if (reverse) "\n\nOnce Done, Return $moving To The Starting Position By Doing The Opposite Motion" else ""}"
+        }
+
+        private val TAG = "DC"
     }
 }

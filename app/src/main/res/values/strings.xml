@@ -4,15 +4,11 @@
     <string name="welcome_label">Welcome</string>
     <string name="initial_instructions_label">Stage 1 - Instructions</string>
     <string name="initial_data_collection_label">Stage 1 - Data Collection</string>
-    <string name="final_instructions_label">Stage 2 - Instructions</string>
-    <string name="final_data_collection_label">Stage 2 - Data Collection</string>
-    <string name="exit_label">Exercise Complete</string>
+    <string name="exit_label">Submit &amp; Exit</string>
     <string name="next">Next</string>
     <string name="begin">Begin</string>
     <string name="previous">Previous</string>
     <string name="confirm">Confirm</string>
-    <string name="record">●</string>
-    <string name="pause">■</string>
 
     <!--  Motions  -->
     <string name="motion_arg_name">motion</string>
@@ -27,121 +23,92 @@
     <string name="peaking_phone">PEAKING_PHONE</string>
     <string name="peaking_head">PEAKING_HEAD</string>
 
-    <!-- Instructions -->
-    <string name="initial_instructions">
-        Temp Instructions
-    </string>
-    <string name="pointing_translate_phone_instructions">
-        Hold the phone at a comfortable distance from your face, such that the screen is facing you and the centre is aligned with your nose. You may support your arm if this is required.
-        \nWhile keeping your face still, move the phone such that your nose is aligned with the target on screen, then return the phone to the starting position (such that nose is aligned with the centre of the screen).
-        \n\nThe phone should not be rotated, and the screen should remain parallel to your face.
-        \n\ne.g. if the target is in the bottom left of the screen, you should move the phone up an to the right until the target is aligned with your nose. Then perform the opposite motion to return the phone to the starting position.
-    </string>
-    <string name="pointing_rotate_phone_instructions">
-        Hold the phone at a comfortable distance from your face, such that the screen is facing you and the centre is aligned with your nose.
-        \nWhile keeping your face still, twist/rotate the phone such that your nose is aligned with the target on screen, then return the phone to the starting position (such that nose is aligned with the centre of the screen).
-        \nThe phone should remain in the same position (e.g. it should not be moved up, down, left, or right).
-        \ne.g. if the target is in the bottom left of the screen, you should rotate the phone to bring the bottom left corner towards your face. Then perform the opposite motion to return the phone to the starting position.
-    </string>
-    <string name="pointing_rotate_head_instructions">
-        Hold the phone at a comfortable distance from your face, such that the screen is facing you and the centre is aligned with your nose.
-        \nWhile keeping the phone still, twist/rotate your head such that your nose is aligned with the target on screen, then return your head to the starting position (such that nose is aligned with the centre of the screen).
-        \n\nThe phone should remain in the same position (e.g. it should not be moved or rotated).
-        \n\ne.g. if the target is in the bottom left of the screen, you should rotate your head to look down and to the left, such that your nose is pointing towards the target. Then perform the opposite motion to return the phone to the starting position.
-    </string>
-    <string name="translate_phone_instructions">
-        Hold the phone at a comfortable distance from your face, such that the screen is facing you and the centre is aligned with your nose.
-        \nWhile keeping your head still, move the phone such that as much of the phone screen is not in-front of your face, whilst the target is aligned with the nearest edge. Then return the phone to the starting position (such that nose is aligned with the centre of the screen).
-        \n\nThe phone should remain in the same position (e.g. it should not be moved or rotated).
-        \n\ne.g. if the target is in the bottom left of the screen, you should rotate your head to look down and to the left, such that your nose is pointing towards the target. Then perform the opposite motion to return the phone to the starting position.
-    </string>
-    <string name="circular_phone_instructions">
-        Hold the phone at a comfortable distance from your face, such that the screen is facing you and the centre is aligned with your nose.
-        \nWhile keeping your head still and the phone screen parallel to your face, move the phone in a little circle in the same direction as the targets. Your nose should effectively make a circle on the screen. The phone should return to the starting point without needing to reverse the motion.
-        \n\nThe phone should remain in the same position (e.g. it should not be moved or rotated).
-        \n\ne.g. if the target is moving clockwise, move the phone clockwise until you return back to the starting position.
-    </string>
-    <string name="circular_head_instructions">
-        Hold the phone at a comfortable distance from your face, such that the screen is facing you and the centre is aligned with your nose.
-        \nWhile keeping the phone still and the phone screen parallel to your face, move your head such that your nose moves in a little circle in the same direction as the targets. Your head should return to the starting point without needing to reverse the motion.
-        \n\nThe phone should remain in the same position (e.g. it should not be moved or rotated).
-        \n\ne.g. if the target is moving clockwise, rotate your head clockwise until you return back to the starting position.
-    </string>
-    <string name="zoom_phone_instructions">
-        Hold the phone at a comfortable distance from your face, such that the screen is facing you and the centre is aligned with your nose.
-        \nWhile keeping your head still and the phone screen parallel to your face, move the phone towards/away from your head (direction will be provided on screen). Then perform the opposite motion to return the phone to the starting position.
-        \n\nyour head should remain in the same position (e.g. it should not be moved or rotated). Your nose should remain aligned to the target in the centre.
-        \n\ne.g. if the direction is away, push the phone away from your head, then once at fully outstretched return the phone to the starting position.
-    </string>
-    <string name="zoom_head_instructions">
-        Hold the phone at a comfortable distance from your face, such that the screen is facing you and the centre is aligned with your nose.
-        \nWhile keeping the phone still and the phone screen parallel to your face, move your head towards the phone. Then perform the opposite motion to return your head to the starting position.
-        \n\nThe phone should remain in the same position (e.g. it should not be moved or rotated). Your nose should remain aligned to the target in the centre.
-        \n\ne.g. bring your face closer to the phone while trying to keep the phone still, then once the screen is out-of-focus(?) return your head to the starting position.
-    </string>
-    <string name="rotate_head_instructions">
-        Hold the phone at a comfortable distance from your face, such that the screen is facing you and the centre is aligned with your nose.
-        \nWhile keeping the phone still, twist/rotate your head such that your nose is pointing as far off-screen as is comfortable, turning in the direction of the target, then return your head to the starting position (such that nose is aligned with the centre of the screen).
-        \n\nThe phone should remain in the same position (e.g. it should not be moved or rotated).
-        \n\ne.g. if the target is in the left of the screen, you should rotate your head to the left, such that your nose is pointing as far left as is comfortable. Then perform the opposite motion to return the phone to the starting position.
-    </string>
-    <string name="rotate_head_roll_instructions">
-        Hold the phone at a comfortable distance from your face, such that the screen is facing you and the centre is aligned with your nose.
-        \nWhile keeping the phone still, rotate/roll your head such that your nose is still pointing at the centre of the screen, but the top of your head is moving in the same direction as the targets, as far as is comfortable, then return your head to the starting position (the upright position facing the phone).
-        \n\nThe phone should remain in the same position (e.g. it should not be moved or rotated).
-        \n\ne.g. if the target is moving clockwise, you should rotate your head clockwise as far as is comfortable. Then perform the opposite motion to return your head to the starting position.
-    </string>
-    <string name="rotate_phone_roll_instructions">
-        Hold the phone at a comfortable distance from your face, such that the screen is facing you and the centre is aligned with your nose.
-        \nWhile keeping your head still, rotate/roll the phone such that your nose is still pointing at the centre of the screen, but the top of the phone is moving in the same direction as the targets, as far as is comfortable, then return the phone to the starting position (the upright position facing the phone).
-        \n\nYour head should remain in the same position (e.g. it should not be moved or rotated).
-        \n\ne.g. if the target is moving clockwise, you should rotate the phone clockwise as far as is comfortable. Then perform the opposite motion to return the phone to the starting position.
-    </string>
-    <string name="rotation_orbit_phone">
-        Hold the phone at a comfortable distance from your face, such that the screen is facing you and the centre is aligned with your nose.
-        \nWhile keeping your face still, move the phone such that the front facing camera can see different sides of your face. Then return the phone to the starting position (such that nose is aligned with the centre of the screen).
-        \n\nThe phone camera should be pointed towards your face while the phone is moved to another position in-front of your face.
-        \n\ne.g. if the target is in the left of the screen, you should move the phone to the left of your head, while rotating the phone such that the screen is still facing you. Then perform the opposite motion to return the phone to the starting position.
+    <!-- Consent -->
+    <string name="final_consent">I understand that my likeness has been captured by the front facing camera and that I consent to it being used within the related research, and published alongside the research.</string>
+    <string name="disclaimer">
+        As should have been described in the briefing: data collected by this app will include the your likeness, in particular your face, recorded by the front-facing camera.
+        \n\nPlease do not over extend/strain yourself performing any motion. All motions performed should be done in such a way that they don\'t cause any discomfort.
+        \nIf you need a break between the recordings please inform a researcher.
     </string>
 
-    <string name="lorem_ipsum">
-        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam in scelerisque sem. Mauris
-        volutpat, dolor id interdum ullamcorper, risus dolor egestas lectus, sit amet mattis purus
-        dui nec risus. Maecenas non sodales nisi, vel dictum dolor. Class aptent taciti sociosqu ad
-        litora torquent per conubia nostra, per inceptos himenaeos. Suspendisse blandit eleifend
-        diam, vel rutrum tellus vulputate quis. Aliquam eget libero aliquet, imperdiet nisl a,
-        ornare ex. Sed rhoncus est ut libero porta lobortis. Fusce in dictum tellus.\n\n
-        Suspendisse interdum ornare ante. Aliquam nec cursus lorem. Morbi id magna felis. Vivamus
-        egestas, est a condimentum egestas, turpis nisl iaculis ipsum, in dictum tellus dolor sed
-        neque. Morbi tellus erat, dapibus ut sem a, iaculis tincidunt dui. Interdum et malesuada
-        fames ac ante ipsum primis in faucibus. Curabitur et eros porttitor, ultricies urna vitae,
-        molestie nibh. Phasellus at commodo eros, non aliquet metus. Sed maximus nisl nec dolor
-        bibendum, vel congue leo egestas.\n\n
-        Sed interdum tortor nibh, in sagittis risus mollis quis. Curabitur mi odio, condimentum sit
-        amet auctor at, mollis non turpis. Nullam pretium libero vestibulum, finibus orci vel,
-        molestie quam. Fusce blandit tincidunt nulla, quis sollicitudin libero facilisis et. Integer
-        interdum nunc ligula, et fermentum metus hendrerit id. Vestibulum lectus felis, dictum at
-        lacinia sit amet, tristique id quam. Cras eu consequat dui. Suspendisse sodales nunc ligula,
-        in lobortis sem porta sed. Integer id ultrices magna, in luctus elit. Sed a pellentesque
-        est.\n\n
-        Aenean nunc velit, lacinia sed dolor sed, ultrices viverra nulla. Etiam a venenatis nibh.
-        Morbi laoreet, tortor sed facilisis varius, nibh orci rhoncus nulla, id elementum leo dui
-        non lorem. Nam mollis ipsum quis auctor varius. Quisque elementum eu libero sed commodo. In
-        eros nisl, imperdiet vel imperdiet et, scelerisque a mauris. Pellentesque varius ex nunc,
-        quis imperdiet eros placerat ac. Duis finibus orci et est auctor tincidunt. Sed non viverra
-        ipsum. Nunc quis augue egestas, cursus lorem at, molestie sem. Morbi a consectetur ipsum, a
-        placerat diam. Etiam vulputate dignissim convallis. Integer faucibus mauris sit amet finibus
-        convallis.\n\n
-        Phasellus in aliquet mi. Pellentesque habitant morbi tristique senectus et netus et
-        malesuada fames ac turpis egestas. In volutpat arcu ut felis sagittis, in finibus massa
-        gravida. Pellentesque id tellus orci. Integer dictum, lorem sed efficitur ullamcorper,
-        libero justo consectetur ipsum, in mollis nisl ex sed nisl. Donec maximus ullamcorper
-        sodales. Praesent bibendum rhoncus tellus nec feugiat. In a ornare nulla. Donec rhoncus
-        libero vel nunc consequat, quis tincidunt nisl eleifend. Cras bibendum enim a justo luctus
-        vestibulum. Fusce dictum libero quis erat maximus, vitae volutpat diam dignissim.
+    <!-- Instructions -->
+    <string name="initial_instructions">
+        This data collection app will have 12 Data collection stages. Each stage will be focused on performing a different type of motion that you will need to perform with either your head or the phone.
+        \nYou should hold the phone in the same way you would use your phone to browse the internet or send/read messages.
+        \n\nIn each stage you will be provided a video and written instructions describing what you need to do, within the app on the phone.
+        \nIf you have any questions regarding what you need to do, please ask a researcher.
+        \n\nOnce you\'re ready to start, inform the researcher that you\'re ready. They will then ask you to shake the phone, which will trigger a 3 second countdown for you to get ready.
+        \nOnce the 3 second countdown is complete, the app will begin recording data (including images from the front facing camera).
+        \nDuring this time uou should perform the requested motion ONCE, and press the \'Next\' button once complete. This will stop recording data, and take you to the next motion to perform.
+        \nPlease let a researcher know when the countdown is complete.
+        \n\nThis will be repeated until all the actions have been performed.
+        \n\nIf you\'re ready, please let a researcher know and press the button on screen.
     </string>
+    <string name="final_instructions">
+        You have completed the data collection activities. Thank you.
+        \n\nPlease reconfirm that you consent to the usage of the data collected within the study, in particular the capturing of your likeness via the front-facing camera, via the check-box below.
+        \nThis is of course if you still consent to this. If you no longer consent, please inform the researcher/s and continue with the below.
+        \n\n\nPlease remove your earpiece and take off the hat/beanie. Ask for assistance if necessary.
+        \nPlease either place the items provided back onto the table, or hand them back to a researcher.
+        \nJoin the researcher to go over a debrief, wherein the researchers can answer any further questions, and further explain the use of the data and the goal of the research.
+    </string>
+    <string name="pointing_translate_phone_instructions">
+        You should hold the phone in the same way you would use your phone to browse the internet or send/receive messages. You may support your arm if this is required.
+        \n\nImagine a line drawn forward from the tip of your nose.
+        \nWhile keeping your face still, move the phone such that the target on screen is aligned with the line drawn from your nose, then return the phone to the starting position.
+        \nThe phone should not be rotated.
+    </string>
+    <string name="pointing_rotate_phone_instructions">
+        You should hold the phone in the same way you would use your phone to browse the internet or send/receive messages. You may support your arm if this is required.
+        \n\nImagine a line drawn forward from the tip of your nose.
+        \nWhile keeping your face still, turn the phone such that your nose is aligned with the target on screen, then return the phone to the starting position.
+        \nThe phone should remain in the same position.
+    </string>
+    <string name="pointing_rotate_head_instructions">
+        You should hold the phone in the same way you would use your phone to browse the internet or send/receive messages. You may support your arm if this is required.
+        \n\nImagine a line drawn forward from the tip of your nose.
+        \nWhile keeping the phone still, turn your head such that your nose is aligned with the target on screen, then return your head to the starting position.
+    </string>
+    <string name="translate_phone_instructions">
+        You should hold the phone in the same way you would use your phone to browse the internet or send/receive messages. You may support your arm if this is required.
+        \n\nImagine a line drawn forward from the edges of your face.
+        \nWhile keeping your head still, move the phone such that as much of the phone screen is not in-front of your face, whilst the target is aligned with one of your ears, your chine, or your forehead; whichever is requested. Then return the phone to the starting position.
+    </string>
+    <string name="circular_phone_instructions">
+        You should hold the phone in the same way you would use your phone to browse the internet or send/receive messages. You may support your arm if this is required.
+        \n\nWhile keeping your head still and the phone screen facing your face, move the phone in a little circle in the same direction as the targets. The phone should return to the starting point without needing to reverse the motion.
+        \nImagine a line drawn forward from your nose, it should draw a circle on the screen.
+    </string>
+    <string name="circular_head_instructions">
+        You should hold the phone in the same way you would use your phone to browse the internet or send/receive messages. You may support your arm if this is required.
+        \n\nWhile keeping the phone still and the phone screen facing your face, move your head such that your nose moves in a little circle in the direction indicated. Your head should return to the starting point without needing to reverse the motion.
+        \nImagine a line drawn forward from your nose, it should draw a circle.
+    </string>
+    <string name="zoom_phone_instructions">
+        You should hold the phone in the same way you would use your phone to browse the internet or send/receive messages. You may support your arm if this is required.
+        \n\nWhile keeping your head still and the phone screen facing your face, move the phone towards/away from your head (direction will be provided on screen). Then perform the opposite motion to return the phone to the starting position.
+    </string>
+    <string name="zoom_head_instructions">
+        You should hold the phone in the same way you would use your phone to browse the internet or send/receive messages. You may support your arm if this is required.
+        \n\nWhile keeping the phone still and the phone screen facing your face, move your head towards the phone. Then perform the opposite motion to return your head to the starting position.
+        \n\nThe phone should remain in the same position (e.g. it should not be moved or rotated). Your nose should remain aligned to the target in the centre.
+    </string>
+    <string name="rotate_head_instructions">
+        You should hold the phone in the same way you would use your phone to browse the internet or send/receive messages. You may support your arm if this is required.
+        \n\nWhile keeping the phone still, turn your head such that your nose is pointing as far off-screen as is comfortable, turning in the direction of the target, then return your head to the starting position (such that nose is aligned with the centre of the screen).
+        \n\nThe phone should remain in the same position (e.g. it should not be moved or rotated).
+    </string>
+    <string name="rotate_head_roll_instructions">
+        You should hold the phone in the same way you would use your phone to browse the internet or send/receive messages. You may support your arm if this is required.
+        \n\nWhile keeping the phone still, twist your head such that your nose is still pointing at the centre of the screen, but the top of your head is moving in the same direction as the targets, as far as is comfortable, then return your head to the starting position (the upright position facing the phone).
+        \n\nThe phone should remain in the same position (e.g. it should not be moved or rotated).
+    </string>
+    <string name="rotate_phone_roll_instructions">
+        You should hold the phone in the same way you would use your phone to browse the internet or send/receive messages. You may support your arm if this is required.
+        \n\nWhile keeping your head still, twist the phone such that your nose is still pointing at the centre of the screen, but the top of the phone is moving in the same direction as the targets, as far as is comfortable, then return the phone to the starting position (the upright position facing the phone).
+        \n\nYour head should remain in the same position (e.g. it should not be moved or rotated).
+    </string>
+
     <string name="title_activity_data_collection">DataCollectionActivity</string>
     <string name="face_detection">FACE_DETECTION</string>
-    <!-- TODO: Remove or change this placeholder text -->
-    <string name="hello_blank_fragment">Hello blank fragment</string>
 </resources>

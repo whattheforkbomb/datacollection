@@ -113,13 +113,13 @@
             android:id="@+id/centreTarget"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:scaleType="fitXY"
-            android:scaleX="2.0"
-            android:scaleY="2.0"
-            android:alpha="0.7"
-            android:layout_marginBottom="10dp"
             android:layout_gravity="center"
-            app:srcCompat="@drawable/ic_baseline_gps_fixed_24" />
+            android:layout_marginBottom="10dp"
+            android:alpha="0.7"
+            android:scaleType="fitXY"
+            android:scaleX="1.0"
+            android:scaleY="1.0"
+            app:srcCompat="@drawable/ic_baseline_add_24" />
 
         <ImageView
             android:id="@+id/animatedTarget"

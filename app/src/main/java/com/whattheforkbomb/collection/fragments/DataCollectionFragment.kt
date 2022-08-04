@@ -9,7 +9,6 @@ import android.os.Bundle
 import android.os.CountDownTimer
 import android.util.Log
 import android.view.Gravity
-import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.View.INVISIBLE
@@ -19,9 +18,11 @@ import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.core.os.bundleOf
+import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.commit
 import androidx.fragment.app.replace
+import androidx.lifecycle.withCreated
 import androidx.navigation.fragment.findNavController
 import com.whattheforkbomb.collection.R
 import com.whattheforkbomb.collection.data.Instructions
@@ -35,12 +36,14 @@ import kotlin.concurrent.fixedRateTimer
 import kotlin.math.ceil
 import kotlin.math.sqrt
 
+
 /**
  * A simple [Fragment] subclass.
  * Use the [DataCollectionFragment.newInstance] factory method to
  * create an instance of this fragment.
  */
 class DataCollectionFragment : Fragment() {
+    private lateinit var instructionsView: InstructionsView
     private var _binding: FragmentDataCollectionBinding? = null
 
     // This property is only valid between onCreateView and
@@ -101,10 +104,11 @@ class DataCollectionFragment : Fragment() {
                         if (remainingGridPoints[0].first.animated) setAnimation(remainingGridPoints[0].first)
 
                         Log.i(TAG, "Current Target Position: ${remainingGridPoints[0]} - ${remainingGridPoints[0].first.layoutGravity}")
-                        parentFragmentManager.commit {
-                            val bundle = bundleOf(getString(R.string.motion_arg_name) to remainingGridPoints[0].second)
-                            replace<InstructionsView>(R.id.instructions_placeholder, args = bundle)
-                        }
+//                        parentFragmentManager.commit {
+//                            val bundle = bundleOf(getString(R.string.motion_arg_name) to remainingGridPoints[0].second)
+//                            replace<InstructionsView>(R.id.instructions_placeholder, args = bundle)
+//                        }
+                        instructionsView.updateInstructions(remainingGridPoints[0].second)
                     } else {
                         val previousMotion = Motions.values().singleOrNull {
                             it.getNext() == selectedMotion
@@ -152,9 +156,18 @@ class DataCollectionFragment : Fragment() {
 
         Log.i(TAG, "Remaining GridPoints: ${remainingGridPoints.joinToString()}")
 
-        parentFragmentManager.commit {
-            val bundle = bundleOf(getString(R.string.motion_arg_name) to remainingGridPoints[0].second)
-            replace<InstructionsView>(R.id.instructions_placeholder, args = bundle)
+        if (::instructionsView.isInitialized) {
+            instructionsView!!.updateInstructions(remainingGridPoints[0].second)
+        } else {
+            parentFragmentManager.commit {
+                val bundle = bundleOf(getString(R.string.motion_arg_name) to remainingGridPoints[0].second)
+                replace<InstructionsView>(R.id.instructions_placeholder, tag = "INSTRUCTIONS_FRAGMENT_TAG", args = bundle)
+            }
+            parentFragmentManager.addFragmentOnAttachListener { _, fragment ->
+                if (fragment is InstructionsView) {
+                    instructionsView = fragment
+                }
+            }
         }
 
         val layoutParams = FrameLayout.LayoutParams(binding.target.layoutParams)
@@ -205,18 +218,16 @@ class DataCollectionFragment : Fragment() {
             layoutParams.gravity = remainingGridPoints[0].first.layoutGravity
             binding.target.layoutParams = layoutParams
             binding.target.visibility = VISIBLE
+            instructionsView.updateInstructions(remainingGridPoints[0].second)
 
             if (remainingGridPoints[0].first.animated) setAnimation(remainingGridPoints[0].first)
 
-            parentFragmentManager.commit {
-                val bundle = bundleOf(getString(R.string.motion_arg_name) to remainingGridPoints[0].second)
-                replace<InstructionsView>(R.id.instructions_placeholder, args = bundle)
-            }
             Log.i(TAG, "Current Target Position: ${remainingGridPoints[0].first} - ${remainingGridPoints[0].first.layoutGravity}")
         }
     }
 
     private fun startRecording() {
+        instructionsView.stopVideo()
         binding.timer.visibility = VISIBLE
         binding.recordingState.visibility = INVISIBLE
         getTimer(3) {
@@ -347,7 +358,7 @@ class DataCollectionFragment : Fragment() {
             }
 
             else -> {
-                Log.e(Companion.TAG, "There should be no animation for this")
+                Log.e(TAG, "There should be no animation for this")
             }
         }
     }
@@ -387,6 +398,7 @@ class DataCollectionFragment : Fragment() {
         binding.buttonNext.isEnabled = false
         binding.buttonNext.text = "Wait"
         reset(selectedMotion)
+//        instructionsView = parentFragmentManager.findFragmentByTag(INSTRUCTIONS_FRAGMENT_TAG) as InstructionsView
     }
 
     override fun onDestroyView() {
@@ -402,101 +414,101 @@ class DataCollectionFragment : Fragment() {
             POINTING_TRANSLATE_PHONE {
                 override fun getNext() = POINTING_ROTATE_PHONE
                 override fun getTargets() = POINTING_GRID_POINTS.zip(listOf(
-                    Instructions(R.raw.phone_translate_pointing_topcentre, R.drawable.direction_down, "${move("Down", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_translate_pointing_topright, R.drawable.direction_down_left, "${move("Up And To The Left", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_translate_pointing_midright, R.drawable.direction_left, "${move("Left", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_translate_pointing_bottomright, R.drawable.direction_up_left, "${move("Down And To The Left", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_translate_pointing_bottomcentre, R.drawable.direction_up, "${move("Up", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_translate_pointing_bottomleft, R.drawable.direction_up_right, "${move("Up And To The Right", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_translate_pointing_midleft, R.drawable.direction_right, "${move("Right", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_translate_pointing_topleft, R.drawable.direction_down_right, "${move("Down And To The Right", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_translate_pointing_topcentre, R.drawable.direction_down, "${move("Down", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
+                    Instructions(R.raw.phone_translate_pointing_topright, R.drawable.direction_down_left, "${move("Up And To The Left", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
+                    Instructions(R.raw.phone_translate_pointing_midright, R.drawable.direction_left, "${move("Left", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
+                    Instructions(R.raw.phone_translate_pointing_bottomright, R.drawable.direction_up_left, "${move("Down And To The Left", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
+                    Instructions(R.raw.phone_translate_pointing_bottomcentre, R.drawable.direction_up, "${move("Up", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
+                    Instructions(R.raw.phone_translate_pointing_bottomleft, R.drawable.direction_up_right, "${move("Up And To The Right", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
+                    Instructions(R.raw.phone_translate_pointing_midleft, R.drawable.direction_right, "${move("Right", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
+                    Instructions(R.raw.phone_translate_pointing_topleft, R.drawable.direction_down_right, "${move("Down And To The Right", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
                 ))
             },
             POINTING_ROTATE_PHONE {
                 override fun getNext() = POINTING_ROTATE_HEAD
                 override fun getTargets() = POINTING_GRID_POINTS.zip(listOf(
-                    Instructions(R.raw.phone_rotate_pointing_topcentre, R.drawable.direction_down, "${move("Towards Your Nose", "Turn The Top Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_rotate_pointing_topright, R.drawable.direction_down_left, "${move("Towards Your Nose", "Turn The Top Right Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_rotate_pointing_midright, R.drawable.direction_left, "${move("Towards Your Nose", "Turn The Right Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_rotate_pointing_bottomright, R.drawable.direction_up_left, "${move("Towards Your Nose", "Turn The Bottom Right Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_rotate_pointing_bottomcentre, R.drawable.direction_up, "${move("Towards Your Nose", "Turn The Bottom Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_rotate_pointing_bottomleft, R.drawable.direction_up_right, "${move("Towards Your Nose", "Turn The Bottom Left Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_rotate_pointing_midleft, R.drawable.direction_right, "${move("Towards Your Nose", "Turn The Left Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_rotate_pointing_topleft, R.drawable.direction_down_right, "${move("Towards Your Nose", "Turn The Top Left Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_rotate_pointing_topcentre, R.drawable.direction_down, "${move("Towards Your Nose", "Turn The Top Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
+                    Instructions(R.raw.phone_rotate_pointing_topright, R.drawable.direction_down_left, "${move("Towards Your Nose", "Turn The Top Right Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
+                    Instructions(R.raw.phone_rotate_pointing_midright, R.drawable.direction_left, "${move("Towards Your Nose", "Turn The Right Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
+                    Instructions(R.raw.phone_rotate_pointing_bottomright, R.drawable.direction_up_left, "${move("Towards Your Nose", "Turn The Bottom Right Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
+                    Instructions(R.raw.phone_rotate_pointing_bottomcentre, R.drawable.direction_up, "${move("Towards Your Nose", "Turn The Bottom Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
+                    Instructions(R.raw.phone_rotate_pointing_bottomleft, R.drawable.direction_up_right, "${move("Towards Your Nose", "Turn The Bottom Left Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
+                    Instructions(R.raw.phone_rotate_pointing_midleft, R.drawable.direction_right, "${move("Towards Your Nose", "Turn The Left Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
+                    Instructions(R.raw.phone_rotate_pointing_topleft, R.drawable.direction_down_right, "${move("Towards Your Nose", "Turn The Top Left Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
                 ))
             },
             POINTING_ROTATE_HEAD {
                 override fun getNext() = TRANSLATE_PHONE
                 override fun getTargets() = POINTING_GRID_POINTS.zip(listOf(
-                    Instructions(R.raw.head_rotate_pointing_topcentre, R.drawable.direction_up, "${move("Towards The Top Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.head_rotate_pointing_topright, R.drawable.direction_up_right, "${move("Towards The Top Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.head_rotate_pointing_midright, R.drawable.direction_right, "${move("Towards The Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.head_rotate_pointing_bottomright, R.drawable.direction_down_right, "${move("Towards The Bottom Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.head_rotate_pointing_bottomcentre, R.drawable.direction_down, "${move("Towards The Bottom Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.head_rotate_pointing_bottomleft, R.drawable.direction_down_left, "${move("Towards The Bottom Left Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.head_rotate_pointing_midleft, R.drawable.direction_left, "${move("Towards The Left Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.head_rotate_pointing_topleft, R.drawable.direction_up_left, "${move("Towards The Top Left Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_rotate_pointing_topcentre, R.drawable.direction_up, "${move("Towards The Top Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
+                    Instructions(R.raw.head_rotate_pointing_topright, R.drawable.direction_up_right, "${move("Towards The Top Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
+                    Instructions(R.raw.head_rotate_pointing_midright, R.drawable.direction_right, "${move("Towards The Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
+                    Instructions(R.raw.head_rotate_pointing_bottomright, R.drawable.direction_down_right, "${move("Towards The Bottom Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
+                    Instructions(R.raw.head_rotate_pointing_bottomcentre, R.drawable.direction_down, "${move("Towards The Bottom Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
+                    Instructions(R.raw.head_rotate_pointing_bottomleft, R.drawable.direction_down_left, "${move("Towards The Bottom Left Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
+                    Instructions(R.raw.head_rotate_pointing_midleft, R.drawable.direction_left, "${move("Towards The Left Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
+                    Instructions(R.raw.head_rotate_pointing_topleft, R.drawable.direction_up_left, "${move("Towards The Top Left Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
                 ))
             },
             TRANSLATE_PHONE {
                 override fun getNext() = CIRCULAR_PHONE
                 override fun getTargets() = EDGE_GRID_POINTS.zip(listOf(
-                    Instructions(R.raw.phone_translate_topcentre, R.drawable.direction_down, "${move("Down", "Move", true)}\n\n$TARGET_CHIN", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_translate_midright, R.drawable.direction_left, "${move("Left", "Move", true)}\n\n$TARGET_LEFT_EAR", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_translate_bottomcentre, R.drawable.direction_up, "${move("Up", "Move", true)}\n\n$TARGET_FOREHEAD", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_translate_midleft, R.drawable.direction_right, "${move("Right", "Move", true)}\n\n$TARGET_RIGHT_EAR", R.string.pointing_translate_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_translate_topcentre, R.drawable.direction_down, "${move("Down", "Move", true)}\n\n$TARGET_CHIN", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_chin_alignment),
+                    Instructions(R.raw.phone_translate_midright, R.drawable.direction_left, "${move("Left", "Move", true)}\n\n$TARGET_LEFT_EAR", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_ear_alignment_flip),
+                    Instructions(R.raw.phone_translate_bottomcentre, R.drawable.direction_up, "${move("Up", "Move", true)}\n\n$TARGET_FOREHEAD", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_forehead_alignment),
+                    Instructions(R.raw.phone_translate_midleft, R.drawable.direction_right, "${move("Right", "Move", true)}\n\n$TARGET_RIGHT_EAR", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_ear_alignment),
                 ))
             },
             CIRCULAR_PHONE {
                 // little and large circles?
                 override fun getNext() = CIRCULAR_HEAD
                 override fun getTargets() = ROLL_GRID_POINTS.zip(listOf(
-                    Instructions(R.raw.phone_circular_clockwise, R.drawable.direction_clockwise, "${move("Clockwise In A Small Circle", "Move", true, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_circular_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise In A Small Circle", "Move", true, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_circular_clockwise, R.drawable.direction_clockwise, "${move("Clockwise In A Small Circle", "Move", true, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_phone_instructions, R.drawable.phone_circular_alignment),
+                    Instructions(R.raw.phone_circular_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise In A Small Circle", "Move", true, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_phone_instructions, R.drawable.phone_circular_alignment),
                 ))
             },
             CIRCULAR_HEAD {
                 override fun getNext() = ZOOM_PHONE
                 override fun getTargets() = ROLL_GRID_POINTS.zip(listOf(
-                    Instructions(R.raw.head_circular_clockwise, R.drawable.direction_clockwise, "${move("Clockwise In A Small Circle", "While Keeping Your Body/Shoulders Still, Move", false, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_head_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.head_circular_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise In A Small Circle", "While Keeping Your Body/Shoulders Still, Move", false, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_head_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_circular_clockwise, R.drawable.direction_clockwise, "${move("Clockwise In A Small Circle", "While Keeping Your Body/Shoulders Still, Move", false, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_head_instructions, R.drawable.head_circular_alignment),
+                    Instructions(R.raw.head_circular_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise In A Small Circle", "While Keeping Your Body/Shoulders Still, Move", false, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_head_instructions, R.drawable.head_circular_alignment),
                 ))
             },
             ZOOM_PHONE {
                 override fun getNext() = ZOOM_HEAD
                 override fun getTargets() = listOf(GridPoints.ZOOM_IN, GridPoints.ZOOM_OUT).zip(listOf(
-                    Instructions(R.raw.phone_zoom_in, R.drawable.direction_zoom_in, "${move("Towards Your Face", "Move", true)}\n\n$TARGET_CENTRE", R.string.zoom_phone_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_zoom_out, R.drawable.direction_zoom_out, "${move("Away From Your Face", "Move", true)}\n\n$TARGET_CENTRE", R.string.zoom_phone_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_zoom_in, R.drawable.direction_zoom_in, "${move("Towards Your Face", "Move", true)}\n\n$TARGET_CENTRE", R.string.zoom_phone_instructions, R.drawable.phone_zoom_alignment),
+                    Instructions(R.raw.phone_zoom_out, R.drawable.direction_zoom_out, "${move("Away From Your Face", "Move", true)}\n\n$TARGET_CENTRE", R.string.zoom_phone_instructions, R.drawable.phone_zoom_alignment),
                 ))
             },
             ZOOM_HEAD {
                 override fun getNext() = ROTATE_HEAD
                 override fun getTargets() = listOf(GridPoints.ZOOM_IN, GridPoints.ZOOM_OUT).zip(listOf(
-                    Instructions(R.raw.head_zoom_in, R.drawable.direction_zoom_in, "${move("Towards The Phone", "Move", false)}\n\n$TARGET_CENTRE", R.string.zoom_head_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.head_zoom_out, R.drawable.direction_zoom_out, "${move("Away From The Phone", "Move", false)}\n\n$TARGET_CENTRE", R.string.zoom_head_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_zoom_in, R.drawable.direction_zoom_in, "${move("Towards The Phone", "Move", false)}\n\n$TARGET_CENTRE", R.string.zoom_head_instructions, R.drawable.head_zoom_alignment),
+                    Instructions(R.raw.head_zoom_out, R.drawable.direction_zoom_out, "${move("Away From The Phone", "Move", false)}\n\n$TARGET_CENTRE", R.string.zoom_head_instructions, R.drawable.head_zoom_alignment),
                 ))
             },
             ROTATE_HEAD {
                 override fun getNext() = ROTATE_PHONE_ROLL
                 override fun getTargets() = EDGE_GRID_POINTS.zip(listOf(
-                    Instructions(R.raw.head_rotate_topcentre, R.drawable.direction_up, "Look Up\n\nYour Nose Should Be Pointing Above The Top Of The Phone.", R.string.rotate_head_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.head_rotate_midright, R.drawable.direction_right, "Look Right\n\nYour Nose Should Be Pointing Beyond The Right Of The Phone.", R.string.rotate_head_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.head_rotate_bottomcentre, R.drawable.direction_left, "Look Down\n\nYour Nose Should Be Pointing Below The Bottom Of The Phone.", R.string.rotate_head_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.head_rotate_midleft, R.drawable.direction_down, "Look Left\n\nYour Nose Should Be Pointing Beyond The Left Of The Phone.", R.string.rotate_head_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_rotate_topcentre, R.drawable.direction_up, "Look Up\n\nYour Nose Should Be Pointing Above The Top Of The Phone.", R.string.rotate_head_instructions, R.drawable.head_rotate_alignment),
+                    Instructions(R.raw.head_rotate_midright, R.drawable.direction_right, "Look Right\n\nYour Nose Should Be Pointing Beyond The Right Of The Phone.", R.string.rotate_head_instructions, R.drawable.head_rotate_alignment),
+                    Instructions(R.raw.head_rotate_bottomcentre, R.drawable.direction_left, "Look Down\n\nYour Nose Should Be Pointing Below The Bottom Of The Phone.", R.string.rotate_head_instructions, R.drawable.head_rotate_alignment),
+                    Instructions(R.raw.head_rotate_midleft, R.drawable.direction_down, "Look Left\n\nYour Nose Should Be Pointing Beyond The Left Of The Phone.", R.string.rotate_head_instructions, R.drawable.head_rotate_alignment),
                 ))
             },
             ROTATE_PHONE_ROLL {
                 override fun getNext() = ROTATE_HEAD_ROLL
                 override fun getTargets() = ROLL_GRID_POINTS.zip(listOf(
-                    Instructions(R.raw.phone_roll_clockwise, R.drawable.direction_clockwise, "${move("Clockwise", "Tilt", true)}\n\n$TARGET_CENTRE", R.string.rotate_phone_roll_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.phone_roll_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise", "Tilt", true)}\n\n$TARGET_CENTRE", R.string.rotate_phone_roll_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.phone_roll_clockwise, R.drawable.direction_clockwise, "${move("Clockwise", "Tilt", true)}\n\n$TARGET_CENTRE", R.string.rotate_phone_roll_instructions, R.drawable.phone_roll_alignment),
+                    Instructions(R.raw.phone_roll_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise", "Tilt", true)}\n\n$TARGET_CENTRE", R.string.rotate_phone_roll_instructions, R.drawable.phone_roll_alignment),
                 ))
             },
             ROTATE_HEAD_ROLL {
                 override fun getNext(): Motions? = null
                 override fun getTargets() = ROLL_GRID_POINTS.zip(listOf(
-                    Instructions(R.raw.head_roll_clockwise, R.drawable.direction_clockwise, "${move("Clockwise", "Tilt", false)}\n\n$TARGET_CENTRE", R.string.rotate_head_roll_instructions, R.drawable.facedetected),
-                    Instructions(R.raw.head_roll_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise", "false", true)}\n\n$TARGET_CENTRE", R.string.rotate_head_roll_instructions, R.drawable.facedetected),
+                    Instructions(R.raw.head_roll_clockwise, R.drawable.direction_clockwise, "${move("Clockwise", "Tilt", false)}\n\n$TARGET_CENTRE", R.string.rotate_head_roll_instructions, R.drawable.head_roll_alignment),
+                    Instructions(R.raw.head_roll_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise", "false", true)}\n\n$TARGET_CENTRE", R.string.rotate_head_roll_instructions, R.drawable.head_roll_alignment),
                 ))
             };
 
@@ -554,6 +566,6 @@ class DataCollectionFragment : Fragment() {
             return "$modifier $moving $direction While Keeping $stationary Still.${if (reverse) "\n\nOnce Done, Return $moving To The Starting Position By Doing The Opposite Motion" else ""}"
         }
 
-        private val TAG = "DC"
+        private const val TAG = "DC"
     }
 }

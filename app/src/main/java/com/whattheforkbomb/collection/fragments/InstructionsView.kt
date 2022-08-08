@@ -51,9 +51,11 @@ class InstructionsView : Fragment() {
         binding.video.setVideoPath("android.resource://${activity!!.packageName}/${instruction.videoId}")
         binding.video.start()
         binding.video.setOnPreparedListener { it.isLooping = true }
-        binding.instructionsText.text = instruction.instructionText
-        binding.guideText.setText(instruction.alignmentGuideTextId)
-        binding.imageGuide.setImageResource(instruction.alignmentGuideImageId)
+        if (instruction.alignmentGuideTextId != DataCollectionFragment.NO_ALIGNMENT_INSTRCUTIONS) {
+            binding.instructionsText.text = instruction.instructionText
+            binding.guideText.setText(instruction.alignmentGuideTextId)
+            binding.imageGuide.setImageResource(instruction.alignmentGuideImageId)
+        }
     }
 
     fun stopVideo() {

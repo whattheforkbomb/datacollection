@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit
  * Service to ensure required permissions are obtained prior to attempting to interface with
  *  permission restricted hardware (camera and sensors)
  */
-class PermissionsService() {
+class PermissionsService {
 
     private val requiredPermissions: MutableMap<String, Boolean> = mutableMapOf()
     private val latch = CountDownLatch(1)

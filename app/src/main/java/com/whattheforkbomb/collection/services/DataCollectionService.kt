@@ -33,6 +33,7 @@ class DataCollectionService private constructor(private val rootDir: Path, priva
     fun generateNewParticipantId(): UUID { // call on app reset?
         participantId = UUID.randomUUID()
         filePath = Paths.get(rootDir.pathString, participantId.toString())
+        filePath.toFile().mkdirs()
         return participantId
     }
 
@@ -46,6 +47,7 @@ class DataCollectionService private constructor(private val rootDir: Path, priva
      *   - Need Executor to setup (and run?) collectors
      */
 
+    // TODO: Save down to session wide file when start capturing, both time since shake, and time since app startup?
     fun start(repetitions: Int, motion: DataCollectionFragment.Companion.Motions, gridPoint: DataCollectionFragment.Companion.GridPoints) {
         if (!running) {
             running = true

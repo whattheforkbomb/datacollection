@@ -4,7 +4,6 @@ import android.content.Context
 import android.hardware.SensorManager
 import android.os.Bundle
 import android.util.Log
-import android.view.View.INVISIBLE
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -16,12 +15,20 @@ import com.whattheforkbomb.collection.R
 import com.whattheforkbomb.collection.databinding.ActivityMainBinding
 import com.whattheforkbomb.collection.services.*
 import com.whattheforkbomb.collection.viewmodels.DataCollectionViewModel
+import org.opencv.android.BaseLoaderCallback
+import org.opencv.android.LoaderCallbackInterface
+import org.opencv.android.OpenCVLoader
+import java.nio.file.Paths
+import kotlin.io.path.pathString
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var binding: ActivityMainBinding
     private val model: DataCollectionViewModel by viewModels()
+    private val longRunningSensorRecorder by lazy {
+        SensorProcessor(getSystemService(Context.SENSOR_SERVICE) as SensorManager)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,12 +38,25 @@ class MainActivity : AppCompatActivity() {
         model.dataCollectionService = DataCollectionService.Builder(filePath, this)
             .registerDataCollector(CameraProcessor(applicationContext))
             .registerDataCollector(SensorProcessor(getSystemService(Context.SENSOR_SERVICE) as SensorManager))
-            .registerDataCollector(EarableProcessor(applicationContext))
+//            .registerDataCollector(EarableProcessor(applicationContext))
             .build()
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        longRunningSensorRecorder.start(Paths.get(filePath.pathString, model.dataCollectionService.getParticipantId().toString()).pathString)
+//        OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_4_0, applicationContext, object : BaseLoaderCallback(this) {
+//            override fun onManagerConnected(status: Int) {
+//                when (status) {
+//                    LoaderCallbackInterface.SUCCESS -> {
+//                        Log.i("OpenCV", "OpenCV loaded successfully")
+//                    }
+//                    else -> {
+//                        super.onManagerConnected(status)
+//                    }
+//                }
+//            }
+//        })
         setSupportActionBar(binding.toolbar)
         actionBar?.setDisplayHomeAsUpEnabled(false)
 
@@ -56,7 +76,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        Log.i("MA", "Permission request result received")
+        Log.i(TAG, "Permission request result received")
         model.dataCollectionService.permissionsService.onPermsResult(permissions, grantResults)
+    }
+
+    companion object {
+//        init {
+//            System.loadLibrary("opencv_java")
+//        }
+        private const val TAG = "MA"
     }
 }

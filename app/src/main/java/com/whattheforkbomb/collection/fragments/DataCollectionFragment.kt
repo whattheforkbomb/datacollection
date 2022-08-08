@@ -1,6 +1,7 @@
 package com.whattheforkbomb.collection.fragments
 
 import android.content.Context
+import android.graphics.Color
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -62,6 +63,7 @@ class DataCollectionFragment : Fragment() {
     private lateinit var timer: CountDownTimer
     @Volatile private var animationTimer: Timer? = null
     @Volatile private var pendingShake = false
+    @Volatile private var pendingSecondShake = false
     private var readyToRecord: Boolean = false // Replace with variable binding from fragment
         set(value) {
             if (value && !binding.buttonNext.isEnabled) {
@@ -70,6 +72,7 @@ class DataCollectionFragment : Fragment() {
             field = value
         }
 
+    // TODO: check that direction changed twice with threshold exceeded within 1-2sec(?), not just once.
     private val shakeDetector = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent?) {
             if (pendingShake && shakeDetected(event!!.values)) {
@@ -133,31 +136,17 @@ class DataCollectionFragment : Fragment() {
         return binding.root
     }
 
-    private fun reset(motion: Motions, reverse: Boolean = false) {
+    private fun setupDataCollection() {
+        pendingShake = true
         binding.timer.visibility = INVISIBLE
         binding.recordingState.text = "PENDING SHAKE"
         binding.recordingState.visibility = VISIBLE
-        selectedMotion = motion
         binding.target.scaleX = 1.0F
         binding.target.scaleY = 1.0F
         binding.target.visibility = VISIBLE
-        activity!!.title = "Data Collection Stage ${selectedMotion.ordinal+1}/${Motions.values().size} - Attempt ${repetitions+1}/5"
-        remainingGridPoints = selectedMotion.getTargets()
-        previousGridPoints = remainingGridPoints.toList()
-        binding.progress.min = 0
-        binding.progress.max = remainingGridPoints.size
-        binding.progress.progress = 0
-        if (reverse) {
-            binding.progress.progress = remainingGridPoints.size - 1
-            remainingGridPoints = listOf(remainingGridPoints.last())
-        }
-
-        sensorManager.registerListener(shakeDetector, accelerometerSensor, SensorManager.SENSOR_DELAY_UI)
-
-        Log.i(TAG, "Remaining GridPoints: ${remainingGridPoints.joinToString()}")
 
         if (::instructionsView.isInitialized) {
-            instructionsView!!.updateInstructions(remainingGridPoints[0].second)
+            instructionsView.updateInstructions(remainingGridPoints[0].second)
         } else {
             parentFragmentManager.commit {
                 val bundle = bundleOf(getString(R.string.motion_arg_name) to remainingGridPoints[0].second)
@@ -182,8 +171,46 @@ class DataCollectionFragment : Fragment() {
             timer.cancel()
             nextMotion()
         }
+    }
 
+    private fun reset(motion: Motions, reverse: Boolean = false) {
         recording = false
+        selectedMotion = motion
+        remainingGridPoints = selectedMotion.getTargets()
+        previousGridPoints = remainingGridPoints.toList()
+        binding.progress.min = 0
+        binding.progress.max = remainingGridPoints.size
+        binding.progress.progress = 0
+        if (reverse) {
+            binding.progress.progress = remainingGridPoints.size - 1
+            remainingGridPoints = listOf(remainingGridPoints.last())
+        }
+
+        activity!!.title = "Data Collection Stage ${selectedMotion.ordinal+1}/${Motions.values().size} - Attempt ${repetitions+1}/5"
+        Log.i(TAG, "Remaining GridPoints: ${remainingGridPoints.joinToString()}")
+
+        val currentInstructions = remainingGridPoints[0].second
+        if (currentInstructions.alignmentGuideTextId != NO_ALIGNMENT_INSTRCUTIONS) {
+            binding.alignmentImage.visibility = INVISIBLE
+            binding.alignmentText.visibility = VISIBLE
+            binding.dataCollection.visibility = INVISIBLE
+            binding.alignmentGuide.visibility = VISIBLE
+            binding.alignmentImage.setImageResource(currentInstructions.alignmentGuideImageId)
+            binding.alignmentText.setText(currentInstructions.alignmentGuideTextId)
+
+            binding.alignmentNext.setOnClickListener {
+                if (binding.alignmentImage.visibility == INVISIBLE) {
+                    binding.alignmentText.visibility = INVISIBLE
+                    binding.alignmentImage.visibility = VISIBLE
+                } else {
+                    binding.alignmentGuide.visibility = INVISIBLE
+                    binding.dataCollection.visibility = VISIBLE
+                    setupDataCollection()
+                }
+            }
+        } else {
+            setupDataCollection()
+        }
     }
 
     private fun nextMotion() {
@@ -192,9 +219,9 @@ class DataCollectionFragment : Fragment() {
         recording=false
         model.dataCollectionService.stop()
         binding.progress.progress = binding.progress.progress + 1
-        pendingShake = true
         binding.target.scaleX = 1.0F
         binding.target.scaleY = 1.0F
+        binding.recordingState.setTextColor(Color.WHITE)
         if (remainingGridPoints.size == 1) {
             val nextMotion = selectedMotion.getNext()
             animationTimer?.cancel()
@@ -211,8 +238,12 @@ class DataCollectionFragment : Fragment() {
         } else {
             val layoutParams = FrameLayout.LayoutParams(binding.target.layoutParams)
             binding.timer.visibility = INVISIBLE
-            binding.recordingState.text = "PENDING SHAKE"
+            binding.recordingState.text = "NEXT MOTION"
             binding.recordingState.visibility = VISIBLE
+            getTimer(2) {
+                binding.recordingState.text = "PENDING SHAKE"
+                pendingShake = true
+            }.start()
             remainingGridPoints = remainingGridPoints.subList(1, remainingGridPoints.size)
 
             layoutParams.gravity = remainingGridPoints[0].first.layoutGravity
@@ -234,6 +265,8 @@ class DataCollectionFragment : Fragment() {
             binding.timer.visibility = INVISIBLE
             binding.recordingState.visibility = VISIBLE
             binding.recordingState.text = "RECORDING"
+            binding.recordingState.setTextColor(Color.RED)
+
             recording = true
             model.dataCollectionService.start(repetitions, selectedMotion, remainingGridPoints[0].first)
             timer = getTimer(2) {
@@ -283,84 +316,84 @@ class DataCollectionFragment : Fragment() {
     }
 
     private fun setAnimation(gridPoints: GridPoints) {
-        animationTimer?.cancel()
-        when(gridPoints) {
-            GridPoints.ZOOM_IN -> {
-                binding.target.visibility = INVISIBLE
-                val maxScale = 3.0
-                animationTimer = fixedRateTimer("AnimationTimer", true, 0L, (400).toLong()) {
-                    val newScale = binding.target.scaleX + 0.5
-                    if (newScale <= maxScale) {
-                        activity!!.runOnUiThread {
-                            binding.target.scaleX = newScale.toFloat()
-                            binding.target.scaleY = newScale.toFloat()
-                        }
-                    } else {
-                        activity!!.runOnUiThread {
-                            binding.target.scaleX = 1.0.toFloat()
-                            binding.target.scaleY = 1.0.toFloat()
-                        }
-                    }
-                }
-            }
-
-            GridPoints.ZOOM_OUT -> {
-                binding.target.visibility = INVISIBLE
-                val maxScale = 3.0
-                animationTimer = fixedRateTimer("AnimationTimer", true, 0L, (400).toLong()) {
-                    val newScale = binding.target.scaleX - 0.5
-                    if (newScale >= 1.0) {
-                        activity!!.runOnUiThread {
-                            binding.target.scaleX = newScale.toFloat()
-                            binding.target.scaleY = newScale.toFloat()
-                        }
-                    } else {
-                        activity!!.runOnUiThread {
-                            binding.target.scaleX = maxScale.toFloat()
-                            binding.target.scaleY = maxScale.toFloat()
-                        }
-                    }
-                }
-            }
-
-            GridPoints.CLOCKWISE -> {
-                binding.animatedTarget.visibility = VISIBLE
-                val positions = POINTING_GRID_POINTS
-                var currentIdx = 0
-                val layoutParams =  FrameLayout.LayoutParams(binding.animatedTarget.layoutParams)
-                animationTimer = fixedRateTimer("AnimationTimer", true, 0L, (400).toLong()) {
-                    currentIdx = if (currentIdx < positions.size-1)
-                        currentIdx + 1
-                    else
-                        0
-                    layoutParams.gravity = positions[currentIdx].layoutGravity
-                    activity!!.runOnUiThread {
-                        binding.animatedTarget.layoutParams = layoutParams
-                    }
-                }
-            }
-
-            GridPoints.ANTI_CLOCKWISE -> {
-                binding.animatedTarget.visibility = VISIBLE
-                val positions = POINTING_GRID_POINTS.reversed()
-                var currentIdx = 0
-                val layoutParams =  FrameLayout.LayoutParams(binding.animatedTarget.layoutParams)
-                animationTimer = fixedRateTimer("AnimationTimer", true, 0L, (400).toLong()) {
-                    currentIdx = if (currentIdx < positions.size-1)
-                        currentIdx + 1
-                    else
-                        0
-                    layoutParams.gravity = positions[currentIdx].layoutGravity
-                    activity!!.runOnUiThread {
-                        binding.animatedTarget.layoutParams = layoutParams
-                    }
-                }
-            }
-
-            else -> {
-                Log.e(TAG, "There should be no animation for this")
-            }
-        }
+//        animationTimer?.cancel()
+//        when(gridPoints) {
+//            GridPoints.ZOOM_IN -> {
+//                binding.target.visibility = INVISIBLE
+//                val maxScale = 3.0
+//                animationTimer = fixedRateTimer("AnimationTimer", true, 0L, (400).toLong()) {
+//                    val newScale = binding.target.scaleX + 0.5
+//                    if (newScale <= maxScale) {
+//                        activity!!.runOnUiThread {
+//                            binding.target.scaleX = newScale.toFloat()
+//                            binding.target.scaleY = newScale.toFloat()
+//                        }
+//                    } else {
+//                        activity!!.runOnUiThread {
+//                            binding.target.scaleX = 1.0.toFloat()
+//                            binding.target.scaleY = 1.0.toFloat()
+//                        }
+//                    }
+//                }
+//            }
+//
+//            GridPoints.ZOOM_OUT -> {
+//                binding.target.visibility = INVISIBLE
+//                val maxScale = 3.0
+//                animationTimer = fixedRateTimer("AnimationTimer", true, 0L, (400).toLong()) {
+//                    val newScale = binding.target.scaleX - 0.5
+//                    if (newScale >= 1.0) {
+//                        activity!!.runOnUiThread {
+//                            binding.target.scaleX = newScale.toFloat()
+//                            binding.target.scaleY = newScale.toFloat()
+//                        }
+//                    } else {
+//                        activity!!.runOnUiThread {
+//                            binding.target.scaleX = maxScale.toFloat()
+//                            binding.target.scaleY = maxScale.toFloat()
+//                        }
+//                    }
+//                }
+//            }
+//
+//            GridPoints.CLOCKWISE -> {
+//                binding.animatedTarget.visibility = VISIBLE
+//                val positions = POINTING_GRID_POINTS
+//                var currentIdx = 0
+//                val layoutParams =  FrameLayout.LayoutParams(binding.animatedTarget.layoutParams)
+//                animationTimer = fixedRateTimer("AnimationTimer", true, 0L, (400).toLong()) {
+//                    currentIdx = if (currentIdx < positions.size-1)
+//                        currentIdx + 1
+//                    else
+//                        0
+//                    layoutParams.gravity = positions[currentIdx].layoutGravity
+//                    activity!!.runOnUiThread {
+//                        binding.animatedTarget.layoutParams = layoutParams
+//                    }
+//                }
+//            }
+//
+//            GridPoints.ANTI_CLOCKWISE -> {
+//                binding.animatedTarget.visibility = VISIBLE
+//                val positions = POINTING_GRID_POINTS.reversed()
+//                var currentIdx = 0
+//                val layoutParams =  FrameLayout.LayoutParams(binding.animatedTarget.layoutParams)
+//                animationTimer = fixedRateTimer("AnimationTimer", true, 0L, (400).toLong()) {
+//                    currentIdx = if (currentIdx < positions.size-1)
+//                        currentIdx + 1
+//                    else
+//                        0
+//                    layoutParams.gravity = positions[currentIdx].layoutGravity
+//                    activity!!.runOnUiThread {
+//                        binding.animatedTarget.layoutParams = layoutParams
+//                    }
+//                }
+//            }
+//
+//            else -> {
+//                Log.e(TAG, "There should be no animation for this")
+//            }
+//        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -369,9 +402,11 @@ class DataCollectionFragment : Fragment() {
         Log.i(TAG, "Motion: $selectedMotion")
         readyToRecord = model.dataCollectionService.ready
         binding.timeRemaining = TimeRemaining(0, 0)
+        sensorManager = activity!!.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         if (!readyToRecord) executor.execute {
             model.dataCollectionService.setup {
-                pendingShake = true
+                sensorManager.registerListener(shakeDetector, accelerometerSensor, SensorManager.SENSOR_DELAY_UI)
                 activity!!.runOnUiThread {
                     readyToRecord = it
                     val toast = if (!it) {
@@ -391,10 +426,9 @@ class DataCollectionFragment : Fragment() {
                     toast.show()
                 }
             }
-        } else
-            pendingShake = true
-        sensorManager = activity!!.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        } else {
+            sensorManager.registerListener(shakeDetector, accelerometerSensor, SensorManager.SENSOR_DELAY_UI)
+        }
         binding.buttonNext.isEnabled = false
         binding.buttonNext.text = "Wait"
         reset(selectedMotion)
@@ -408,46 +442,48 @@ class DataCollectionFragment : Fragment() {
     }
 
     companion object {
+        const val NO_ALIGNMENT_INSTRCUTIONS = -1
         private const val SHAKE_THRESHOLD = 2.0
+        private const val TAG = "DC"
 
         enum class Motions {
             POINTING_TRANSLATE_PHONE {
                 override fun getNext() = POINTING_ROTATE_PHONE
                 override fun getTargets() = POINTING_GRID_POINTS.zip(listOf(
                     Instructions(R.raw.phone_translate_pointing_topcentre, R.drawable.direction_down, "${move("Down", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
-                    Instructions(R.raw.phone_translate_pointing_topright, R.drawable.direction_down_left, "${move("Up And To The Left", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
-                    Instructions(R.raw.phone_translate_pointing_midright, R.drawable.direction_left, "${move("Left", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
-                    Instructions(R.raw.phone_translate_pointing_bottomright, R.drawable.direction_up_left, "${move("Down And To The Left", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
-                    Instructions(R.raw.phone_translate_pointing_bottomcentre, R.drawable.direction_up, "${move("Up", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
-                    Instructions(R.raw.phone_translate_pointing_bottomleft, R.drawable.direction_up_right, "${move("Up And To The Right", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
-                    Instructions(R.raw.phone_translate_pointing_midleft, R.drawable.direction_right, "${move("Right", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
-                    Instructions(R.raw.phone_translate_pointing_topleft, R.drawable.direction_down_right, "${move("Down And To The Right", "Move", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_translate_pointing_alignment),
+                    Instructions(R.raw.phone_translate_pointing_topright, R.drawable.direction_down_left, "${move("Down And To The Left", "Move", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.phone_translate_pointing_midright, R.drawable.direction_left, "${move("Left", "Move", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.phone_translate_pointing_bottomright, R.drawable.direction_up_left, "${move("Down And To The Left", "Move", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.phone_translate_pointing_bottomcentre, R.drawable.direction_up, "${move("Up", "Move", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.phone_translate_pointing_bottomleft, R.drawable.direction_up_right, "${move("Up And To The Right", "Move", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.phone_translate_pointing_midleft, R.drawable.direction_right, "${move("Right", "Move", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.phone_translate_pointing_topleft, R.drawable.direction_down_right, "${move("Down And To The Right", "Move", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
                 ))
             },
             POINTING_ROTATE_PHONE {
                 override fun getNext() = POINTING_ROTATE_HEAD
                 override fun getTargets() = POINTING_GRID_POINTS.zip(listOf(
                     Instructions(R.raw.phone_rotate_pointing_topcentre, R.drawable.direction_down, "${move("Towards Your Nose", "Turn The Top Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
-                    Instructions(R.raw.phone_rotate_pointing_topright, R.drawable.direction_down_left, "${move("Towards Your Nose", "Turn The Top Right Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
-                    Instructions(R.raw.phone_rotate_pointing_midright, R.drawable.direction_left, "${move("Towards Your Nose", "Turn The Right Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
-                    Instructions(R.raw.phone_rotate_pointing_bottomright, R.drawable.direction_up_left, "${move("Towards Your Nose", "Turn The Bottom Right Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
-                    Instructions(R.raw.phone_rotate_pointing_bottomcentre, R.drawable.direction_up, "${move("Towards Your Nose", "Turn The Bottom Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
-                    Instructions(R.raw.phone_rotate_pointing_bottomleft, R.drawable.direction_up_right, "${move("Towards Your Nose", "Turn The Bottom Left Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
-                    Instructions(R.raw.phone_rotate_pointing_midleft, R.drawable.direction_right, "${move("Towards Your Nose", "Turn The Left Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
-                    Instructions(R.raw.phone_rotate_pointing_topleft, R.drawable.direction_down_right, "${move("Towards Your Nose", "Turn The Top Left Corner Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
+                    Instructions(R.raw.phone_rotate_pointing_topright, R.drawable.direction_down_left, "${move("Towards Your Nose", "Turn The Top Right Corner Of", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.phone_rotate_pointing_midright, R.drawable.direction_left, "${move("Towards Your Nose", "Turn The Right Edge Of", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.phone_rotate_pointing_bottomright, R.drawable.direction_up_left, "${move("Towards Your Nose", "Turn The Bottom Right Corner Of", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.phone_rotate_pointing_bottomcentre, R.drawable.direction_up, "${move("Towards Your Nose", "Turn The Bottom Edge Of", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.phone_rotate_pointing_bottomleft, R.drawable.direction_up_right, "${move("Towards Your Nose", "Turn The Bottom Left Corner Of", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.phone_rotate_pointing_midleft, R.drawable.direction_right, "${move("Towards Your Nose", "Turn The Left Edge Of", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.phone_rotate_pointing_topleft, R.drawable.direction_down_right, "${move("Towards Your Nose", "Turn The Top Left Corner Of", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
                 ))
             },
             POINTING_ROTATE_HEAD {
                 override fun getNext() = TRANSLATE_PHONE
                 override fun getTargets() = POINTING_GRID_POINTS.zip(listOf(
-                    Instructions(R.raw.head_rotate_pointing_topcentre, R.drawable.direction_up, "${move("Towards The Top Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
-                    Instructions(R.raw.head_rotate_pointing_topright, R.drawable.direction_up_right, "${move("Towards The Top Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
-                    Instructions(R.raw.head_rotate_pointing_midright, R.drawable.direction_right, "${move("Towards The Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
-                    Instructions(R.raw.head_rotate_pointing_bottomright, R.drawable.direction_down_right, "${move("Towards The Bottom Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
-                    Instructions(R.raw.head_rotate_pointing_bottomcentre, R.drawable.direction_down, "${move("Towards The Bottom Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
-                    Instructions(R.raw.head_rotate_pointing_bottomleft, R.drawable.direction_down_left, "${move("Towards The Bottom Left Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
-                    Instructions(R.raw.head_rotate_pointing_midleft, R.drawable.direction_left, "${move("Towards The Left Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
-                    Instructions(R.raw.head_rotate_pointing_topleft, R.drawable.direction_up_left, "${move("Towards The Top Left Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.head_rotate_pointing_alignment),
+                    Instructions(R.raw.head_rotate_pointing_topcentre, R.drawable.direction_up, "${move("Towards The Top Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.head_rotate_pointing_topright, R.drawable.direction_up_right, "${move("Towards The Top Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.head_rotate_pointing_midright, R.drawable.direction_right, "${move("Towards The Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.head_rotate_pointing_bottomright, R.drawable.direction_down_right, "${move("Towards The Bottom Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.head_rotate_pointing_bottomcentre, R.drawable.direction_down, "${move("Towards The Bottom Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.head_rotate_pointing_bottomleft, R.drawable.direction_down_left, "${move("Towards The Bottom Left Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.head_rotate_pointing_midleft, R.drawable.direction_left, "${move("Towards The Left Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.head_rotate_pointing_topleft, R.drawable.direction_up_left, "${move("Towards The Top Left Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
                 ))
             },
             TRANSLATE_PHONE {
@@ -464,51 +500,51 @@ class DataCollectionFragment : Fragment() {
                 override fun getNext() = CIRCULAR_HEAD
                 override fun getTargets() = ROLL_GRID_POINTS.zip(listOf(
                     Instructions(R.raw.phone_circular_clockwise, R.drawable.direction_clockwise, "${move("Clockwise In A Small Circle", "Move", true, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_phone_instructions, R.drawable.phone_circular_alignment),
-                    Instructions(R.raw.phone_circular_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise In A Small Circle", "Move", true, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_phone_instructions, R.drawable.phone_circular_alignment),
+                    Instructions(R.raw.phone_circular_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise In A Small Circle", "Move", true, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
                 ))
             },
             CIRCULAR_HEAD {
                 override fun getNext() = ZOOM_PHONE
                 override fun getTargets() = ROLL_GRID_POINTS.zip(listOf(
                     Instructions(R.raw.head_circular_clockwise, R.drawable.direction_clockwise, "${move("Clockwise In A Small Circle", "While Keeping Your Body/Shoulders Still, Move", false, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_head_instructions, R.drawable.head_circular_alignment),
-                    Instructions(R.raw.head_circular_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise In A Small Circle", "While Keeping Your Body/Shoulders Still, Move", false, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", R.string.circular_head_instructions, R.drawable.head_circular_alignment),
+                    Instructions(R.raw.head_circular_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise In A Small Circle", "While Keeping Your Body/Shoulders Still, Move", false, false)}\n\nA Line Originating From The Tip Of Your Nose Should Trace A Circle On The Phone Screen.", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
                 ))
             },
             ZOOM_PHONE {
                 override fun getNext() = ZOOM_HEAD
                 override fun getTargets() = listOf(GridPoints.ZOOM_IN, GridPoints.ZOOM_OUT).zip(listOf(
                     Instructions(R.raw.phone_zoom_in, R.drawable.direction_zoom_in, "${move("Towards Your Face", "Move", true)}\n\n$TARGET_CENTRE", R.string.zoom_phone_instructions, R.drawable.phone_zoom_alignment),
-                    Instructions(R.raw.phone_zoom_out, R.drawable.direction_zoom_out, "${move("Away From Your Face", "Move", true)}\n\n$TARGET_CENTRE", R.string.zoom_phone_instructions, R.drawable.phone_zoom_alignment),
+                    Instructions(R.raw.phone_zoom_out, R.drawable.direction_zoom_out, "${move("Away From Your Face", "Move", true)}\n\n$TARGET_CENTRE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
                 ))
             },
             ZOOM_HEAD {
                 override fun getNext() = ROTATE_HEAD
                 override fun getTargets() = listOf(GridPoints.ZOOM_IN, GridPoints.ZOOM_OUT).zip(listOf(
                     Instructions(R.raw.head_zoom_in, R.drawable.direction_zoom_in, "${move("Towards The Phone", "Move", false)}\n\n$TARGET_CENTRE", R.string.zoom_head_instructions, R.drawable.head_zoom_alignment),
-                    Instructions(R.raw.head_zoom_out, R.drawable.direction_zoom_out, "${move("Away From The Phone", "Move", false)}\n\n$TARGET_CENTRE", R.string.zoom_head_instructions, R.drawable.head_zoom_alignment),
+                    Instructions(R.raw.head_zoom_out, R.drawable.direction_zoom_out, "${move("Away From The Phone", "Move", false)}\n\n$TARGET_CENTRE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
                 ))
             },
             ROTATE_HEAD {
                 override fun getNext() = ROTATE_PHONE_ROLL
                 override fun getTargets() = EDGE_GRID_POINTS.zip(listOf(
                     Instructions(R.raw.head_rotate_topcentre, R.drawable.direction_up, "Look Up\n\nYour Nose Should Be Pointing Above The Top Of The Phone.", R.string.rotate_head_instructions, R.drawable.head_rotate_alignment),
-                    Instructions(R.raw.head_rotate_midright, R.drawable.direction_right, "Look Right\n\nYour Nose Should Be Pointing Beyond The Right Of The Phone.", R.string.rotate_head_instructions, R.drawable.head_rotate_alignment),
-                    Instructions(R.raw.head_rotate_bottomcentre, R.drawable.direction_left, "Look Down\n\nYour Nose Should Be Pointing Below The Bottom Of The Phone.", R.string.rotate_head_instructions, R.drawable.head_rotate_alignment),
-                    Instructions(R.raw.head_rotate_midleft, R.drawable.direction_down, "Look Left\n\nYour Nose Should Be Pointing Beyond The Left Of The Phone.", R.string.rotate_head_instructions, R.drawable.head_rotate_alignment),
+                    Instructions(R.raw.head_rotate_midright, R.drawable.direction_right, "Look Right\n\nYour Nose Should Be Pointing Beyond The Right Of The Phone.", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.head_rotate_bottomcentre, R.drawable.direction_left, "Look Down\n\nYour Nose Should Be Pointing Below The Bottom Of The Phone.", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.head_rotate_midleft, R.drawable.direction_down, "Look Left\n\nYour Nose Should Be Pointing Beyond The Left Of The Phone.", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
                 ))
             },
             ROTATE_PHONE_ROLL {
                 override fun getNext() = ROTATE_HEAD_ROLL
                 override fun getTargets() = ROLL_GRID_POINTS.zip(listOf(
                     Instructions(R.raw.phone_roll_clockwise, R.drawable.direction_clockwise, "${move("Clockwise", "Tilt", true)}\n\n$TARGET_CENTRE", R.string.rotate_phone_roll_instructions, R.drawable.phone_roll_alignment),
-                    Instructions(R.raw.phone_roll_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise", "Tilt", true)}\n\n$TARGET_CENTRE", R.string.rotate_phone_roll_instructions, R.drawable.phone_roll_alignment),
+                    Instructions(R.raw.phone_roll_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise", "Tilt", true)}\n\n$TARGET_CENTRE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
                 ))
             },
             ROTATE_HEAD_ROLL {
                 override fun getNext(): Motions? = null
                 override fun getTargets() = ROLL_GRID_POINTS.zip(listOf(
                     Instructions(R.raw.head_roll_clockwise, R.drawable.direction_clockwise, "${move("Clockwise", "Tilt", false)}\n\n$TARGET_CENTRE", R.string.rotate_head_roll_instructions, R.drawable.head_roll_alignment),
-                    Instructions(R.raw.head_roll_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise", "false", true)}\n\n$TARGET_CENTRE", R.string.rotate_head_roll_instructions, R.drawable.head_roll_alignment),
+                    Instructions(R.raw.head_roll_anticlockwise, R.drawable.direction_anticlockwise, "${move("Anti-Clockwise", "false", true)}\n\n$TARGET_CENTRE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
                 ))
             };
 
@@ -566,6 +602,5 @@ class DataCollectionFragment : Fragment() {
             return "$modifier $moving $direction While Keeping $stationary Still.${if (reverse) "\n\nOnce Done, Return $moving To The Starting Position By Doing The Opposite Motion" else ""}"
         }
 
-        private const val TAG = "DC"
     }
 }

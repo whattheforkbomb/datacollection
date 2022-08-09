@@ -8,6 +8,7 @@ import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
 import android.media.Image
 import android.media.ImageReader
+import android.media.MediaCodec
 import android.util.Log
 import android.util.Range
 import android.view.Surface
@@ -52,7 +53,7 @@ class CameraProcessor(private val appContext: Context): DataCollector {
     @SuppressLint("MissingPermission")
     override fun setup(onReadyCallback: (setupSuccessful: Boolean) -> Unit) {
         executor = Executors.newSingleThreadExecutor()
-        fileSavingExecutor = Executors.newFixedThreadPool(16)
+        fileSavingExecutor = Executors.newFixedThreadPool(1)
         setupCamera2Images()
         onCamera2ReadyCallback = onReadyCallback
     }
@@ -173,7 +174,6 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                         camera2ShouldCapture = false
                         val timeToProcessImage = currentTimeMillis()
                         val size = WIDTH*HEIGHT
-                        val uvSize = (size shr 1)
                         var yuvBytes: ByteArray? = ByteArray(size)
                         image.planes[0].buffer.apply {
                             rewind()

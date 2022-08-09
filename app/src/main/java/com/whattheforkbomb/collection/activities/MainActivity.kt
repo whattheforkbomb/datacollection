@@ -38,7 +38,7 @@ class MainActivity : AppCompatActivity() {
         model.dataCollectionService = DataCollectionService.Builder(filePath, this)
             .registerDataCollector(CameraProcessor(applicationContext))
             .registerDataCollector(SensorProcessor(getSystemService(Context.SENSOR_SERVICE) as SensorManager))
-//            .registerDataCollector(EarableProcessor(applicationContext))
+            .registerDataCollector(EarableProcessor(applicationContext))
             .build()
 
         binding = ActivityMainBinding.inflate(layoutInflater)

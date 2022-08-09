@@ -12,10 +12,10 @@ import android.util.Log
 import android.util.Range
 import android.view.Surface
 import androidx.camera.core.CameraSelector
-import org.opencv.android.Utils
-import org.opencv.core.CvType
-import org.opencv.core.Mat
-import org.opencv.imgproc.Imgproc
+//import org.opencv.android.Utils
+//import org.opencv.core.CvType
+//import org.opencv.core.Mat
+//import org.opencv.imgproc.Imgproc
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -29,7 +29,6 @@ import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.fixedRateTimer
 import kotlin.io.path.pathString
 
@@ -53,7 +52,7 @@ class CameraProcessor(private val appContext: Context): DataCollector {
     @SuppressLint("MissingPermission")
     override fun setup(onReadyCallback: (setupSuccessful: Boolean) -> Unit) {
         executor = Executors.newSingleThreadExecutor()
-        fileSavingExecutor = Executors.newFixedThreadPool(4)
+        fileSavingExecutor = Executors.newFixedThreadPool(16)
         setupCamera2Images()
         onCamera2ReadyCallback = onReadyCallback
     }
@@ -103,7 +102,6 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                 }
 
                 val format = if (RAW_MODE) ImageFormat.RAW_SENSOR else ImageFormat.YUV_420_888
-//                characteristics.get(CameraCharacteristics.format
                 val sizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)!!
                     .getOutputSizes(format)
                 Log.i(TAG, "Possible sizes: ${sizes.joinToString()}")
@@ -172,151 +170,117 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                 if (camera2ShouldCapture) {
                     val image = imageReader?.acquireNextImage()
                     if (image != null) {
-//                        camera2ShouldCapture = false
-                        var timeToSaveImage = 0L
+                        camera2ShouldCapture = false
                         val timeToProcessImage = currentTimeMillis()
-                        if (RAW_MODE) {
-//                            val (bytes, size) = image.use {
-//                                Pair(cloneByteBuffer(it.planes[0].buffer), Size(it.width, it.height))
-//                            }
-//                            Log.d(TAG, "Time to copy Bytes: ${currentTimeMillis() - timeToProcessImage}ms")
-//                            fileSavingExecutor.submit {
-//                                val dngCreator = DngCreator(cameraManager.getCameraCharacteristics(camera2!!.id), result)
-//                                    .setOrientation(ExifInterface.ORIENTATION_NORMAL)
-//                                val timestamp = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS")
-//                                timestamp.timeZone = TimeZone.getTimeZone("UTC")
-//                                val photoFile = File(
-//                                    Paths.get(photoPath!!.pathString, "${timestamp.format(Date())}${extension}")
-//                                        .toUri()
-//                                )
-//                                timeToSaveImage = currentTimeMillis()
-//                                try {
-//                                    FileOutputStream(photoFile).use {
-//                                        dngCreator.writeByteBuffer(it, size, bytes, 0)
+                        val size = WIDTH*HEIGHT
+                        val uvSize = (size shr 1)
+                        var yuvBytes: ByteArray? = ByteArray(size)
+                        image.planes[0].buffer.apply {
+                            rewind()
+                            Log.i(TAG, "y buffer size: ${remaining()}")
+                            get(yuvBytes!!)
+                        }
+//                        image.planes[2].apply {
+//                            buffer.rewind()
+//                            buffer.get(yuvBytes!!, size, uvSize-1)
+////                            Log.i(TAG, "V Row Stride: $rowStride, Pixel Stride: $pixelStride, ${buffer.get(0)}, ${buffer.get(1)} ${buffer.get(2)} ${buffer.get(3)}")
+//                        }
+//                        image.planes[1].apply {
+//                            buffer.rewind()
+//                            yuvBytes!![size + uvSize-1] = buffer.get(uvSize - 2)
+////                            Log.i(TAG, "U Row Stride: $rowStride, Pixel Stride: $pixelStride, ${buffer.get(0)}, ${buffer.get(1)} ${buffer.get(2)} ${buffer.get(3)}")
+//                        }
+                        image.close()
+                        val timestampFormat = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS")
+                        timestampFormat.timeZone = TimeZone.getTimeZone("UTC")
+                        val timestamp = timestampFormat.format(Date())
+                        fileSavingExecutor.submit {
+                            var rgb: IntArray? = IntArray(size)
+                            var index = 0
+                            try {
+//                                var uvI = 0
+//                                var uvICount = 0
+//                                for (i in 0 until HEIGHT) {
+//                                    uvI = i shr 1
+//                                    var uvJ = 0
+//                                    var uvJCount = 2
+//                                    for (j in 0 until WIDTH) {
+//                                        val y = yuvBytes!![index].toInt() and 0xFF
+//
+//                                        val uvIdx = size + ((uvI * WIDTH) + uvJ) //((i shr 1) * WIDTH) + (j - ((0xFF and j) and 0x01))
+//                                        val v = (yuvBytes!![uvIdx].toInt()/* and 0xFF*/) - 128
+//                                        val u = (yuvBytes!![uvIdx + 1].toInt()/* and 0xFF*/) - 128
+//
+//                                        // ABGR
+//                                        // if top left is 0,0: (WIDTH-1-j)*HEIGHT) + i
+//                                        // if bottom left is 0,0: (j*HEIGHT) + (HEIGHT-1-i)
+//                                        rgb!![index++] = getRGB(y, u, v)
+////                                        if (--uvJCount < 1) {
+////                                            uvJ+=2
+////                                            uvJCount = 2
+////                                        }
 //                                    }
-//                                    Log.d(TAG, "Image Captured: ${photoFile.absolutePath}, time to save: ${currentTimeMillis() - timeToSaveImage}ms")
-//                                } catch (ioex: IOException) {
-//                                    Log.e(TAG, "Unable to write DNG image to file", ioex)
-//                                } catch (iaex: IllegalArgumentException) {
-//                                    Log.w(TAG, "Unable to write DNG image to file as no pixels available.", iaex)
+////                                    if (--uvICount < 1) {
+////                                        uvI++
+////                                        uvICount = 2
+////                                    }
 //                                }
-//                            }
-                        } else {
-                            val ySize = image.planes[0].buffer.remaining()
-                            val vuSize = image.planes[2].buffer.remaining()
-                            var nv21: ByteArray? = ByteArray(ySize + vuSize)
-                            image.planes[0].buffer.get(nv21!!, 0, ySize)
-                            image.planes[2].buffer.get(nv21, ySize, vuSize)
-                            image.close()
-                            val size = HEIGHT*WIDTH
-
-//                            val r = ByteArray(size)
-//                            image.planes[0].buffer.get(r)
-//                            val g = ByteArray(size)
-//                            image.planes[1].buffer.get(g)
-//                            val b = ByteArray(size)
-//                            image.planes[2].buffer.get(b)
-                            val timestampFormat = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS")
-                            timestampFormat.timeZone = TimeZone.getTimeZone("UTC")
-                            val timestamp = timestampFormat.format(Date())
-                            fileSavingExecutor.submit {
-//                                val imageBytes = out.toByteArray()
-//                                val colours = IntArray(1920*1080)
-//                                for (i in 0 until (size-1)) {
-//                                    colours[i] = ((0x0 and 0xFF) shl 24) or
-//                                        ((r[i].toInt() and 0xFF) shl 16) or
-//                                        ((g[i].toInt() and 0xFF) shl 8 ) or
-//                                        ((b[i].toInt() and 0xFF) shl 0 )
+//                                var uvOffset = 0
+//                                for (uvOffset in 0 until (size shr 1) step 2) {
+//                                    val y1 = yuvBytes!![index].toInt() and 0xFF
+//                                    val y2 = yuvBytes!![index+1].toInt() and 0xFF
+//                                    val y3 = yuvBytes!![WIDTH+index].toInt() and 0xFF
+//                                    val y4 = yuvBytes!![WIDTH+index+1].toInt() and 0xFF
+//
+//                                    val uvIdx = size + uvOffset//((uvI * WIDTH) + uvJ) //((i shr 1) * WIDTH) + (j - ((0xFF and j) and 0x01))
+//                                    val v = (yuvBytes!![uvIdx].toInt() and 0xFF) - 128
+//                                    val u = (yuvBytes!![uvIdx + 1].toInt() and 0xFF) - 128
+//
+//                                    // ABGR
+//                                    // if top left is 0,0: (WIDTH-1-j)*HEIGHT) + i
+//                                    // if bottom left is 0,0: (j*HEIGHT) + (HEIGHT-1-i)
+//                                    rgb!![index] = getRGB(y1, u, v)
+//                                    rgb[index+1] = getRGB(y2, u, v)
+//                                    rgb[WIDTH+index] = getRGB(y3, u, v)
+//                                    rgb[WIDTH+index+1] = getRGB(y4, u, v)
+//                                    if (index != 0 && (index+2)%WIDTH == 0)
+//                                        index+=WIDTH
+//                                    index += 2
 //                                }
-//                                var rgb: IntArray? = IntArray(size)
-                                Log.i(TAG, "CONVERTING YUV to RGBA")
-//                                val yuvMat = Mat(HEIGHT + (HEIGHT/2), WIDTH, CvType.CV_8UC1)
-//                                yuvMat.put(0,0, nv21!!)
-//                                val rgbMat = Mat()
-//                                Imgproc.cvtColor(yuvMat, rgbMat, Imgproc.COLOR_YUV2RGBA_NV21, 4)
-//                                yuvMat.release()
-//                                val bmp = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888, false)
-//                                Utils.matToBitmap(rgbMat, bmp)
-//                                rgbMat.release()
-                                var rgb: IntArray? = IntArray(size)
-//                                var Y: Int
-//                                var u = 0
-//                                var v = 0
-
-                                var index = 0
-                                try {
-//                                    for (i in 0 until WIDTH) {
-//                                        for (j in 0 until HEIGHT) {
-//                                            val y = nv21!![(i * HEIGHT) + j].toInt().let {
-//                                                if (it < 16) 16 else if (it > 255) 255 else it
-//        //                                        if (Y < 0) Y += 255
-//        //                                        if (Y > 255) Y = 255
-//                                            }
-//                                            val vXIdx = j - (j and 0x01) * WIDTH
-//                                            val vYIdx = (i shr 1)
-//                                            val v = nv21!![size + vXIdx + vYIdx].toInt()
-//                                            val u = nv21!![size + vXIdx + vYIdx + 1].toInt()
-//
-////                                            if (x and 1 == 0) {
-////                                                v = nv21!![size + (((y shr 1) * HEIGHT) + x)].toInt()
-////                                                u = nv21!![size + (((y shr 1) * HEIGHT) + x + 1)].toInt()
-////                                            }
-//    //                                        if (Cb < 0) Cb += 255 else if (Cb > 255) Cb = 255
-//    //                                        if (Cr < 0) Cr += 255 else if (Cr > 255) Cr  = 255
-//                                            var r = (1.164 * (y-16) + 1.596 * (v-128)).toInt()// ((Y + 1.370705 * (Cr-128)).toInt())
-//                                            var g = (1.164 * (y-16) - 0.813 * (v-128) - 0.391 * (u-128)).toInt()// ((Y - (0.698001 * (Cr-128)) - (0.337633 * (Cb-128))).toInt())
-//                                            var b = (1.164 * (y-16) + 2.018 * (u-128)).toInt()// ((Y + (1.732446 * (Cb-128))).toInt())
-//
-//                                            r = if (r > 255) 255 else if (r < 0) 0 else r
-//                                            g = if (g > 255) 255 else if (g < 0) 0 else g
-//                                            b = if (b > 255) 255 else if (b < 0) 0 else b
-//
-//                                            // ABGR
-//                                            rgb!![(i * HEIGHT) + j] = (0xFF shl 24) +
-//                                                        (b shl 16) +
-//                                                        (g shl 8) +
-//                                                        (r)
-//                                            index++
-//                                        }
-//                                    }
-                                    for (i in 0 until HEIGHT step 2) {
-                                        for (j in 0 until WIDTH / 2) {
-                                            val uvIdx = size + (i * WIDTH) + j
-                                            val v = nv21!![uvIdx]
-                                            val u = nv21!![uvIdx + 1]
-
-
-
-                                        }
+//                                val chunkSize = 259200
+//                                (0 until 8).toList().parallelStream().forEach { chunkNum ->
+//                                    val start = chunkSize*chunkNum
+//                                }
+                                for (i in 0 until size) {
+                                    val y = yuvBytes!![i].toInt() and 0xFF.let {
+                                        if (it > 255) 255 else if (it < 0) 0 else it
                                     }
-                                } catch (pkm: Exception) {
-                                    Log.e(TAG, "Something Went Wrong, Index: ${++index}, Size: $size", pkm)
-                                    return@submit
+                                    rgb!![i]=(0xFF shl 24) +
+                                            (y shl 16) +
+                                            (y shl 8) +
+                                            (y)
                                 }
-                                nv21 = null
-                                Log.i(TAG, "Creating Bitmap")
-                                val bmp = Bitmap.createBitmap(HEIGHT, WIDTH, Bitmap.Config.ARGB_8888, false)
-                                bmp.copyPixelsFromBuffer(IntBuffer.wrap(rgb!!))
-                                rgb = null
-//                                rgba = null
-////                                val bmp = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-////                                val mat = Matrix()
-////                                mat.postRotate(SENSOR_ROTATION_COMPENSATION)
-////                                val rotatedBitmap = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, mat, true)
-                                val photoFile = File(Paths.get(photoPath, "$timestamp$extension").toUri())
-                                timeToSaveImage = currentTimeMillis()
-                                try {
-                                    Log.i(TAG, "Saving file")
-                                    FileOutputStream(photoFile).use {
+                            } catch (pkm: Exception) {
+                                Log.e(TAG, "Something Went Wrong, Index: ${index}, Size: $size", pkm)
+                                return@submit
+                            }
+                            yuvBytes = null
+                            val bmp = Bitmap.createBitmap(rgb!!, HEIGHT, WIDTH, Bitmap.Config.ARGB_8888)
+//                            bmp.copyPixelsFromBuffer(IntBuffer.wrap(rgb!!))
+                            rgb = null
+                            val photoFile = File(Paths.get(photoPath, "$timestamp$extension").toUri())
+                            val timeToSaveImage = currentTimeMillis()
+                            try {
+                                Log.i(TAG, "Saving file")
+                                FileOutputStream(photoFile).use {
 //                                        yuvImage.compressToJpeg(Rect(0, 0, yuvImage.width, yuvImage.height), 100, it)
-                                        bmp.compress(Bitmap.CompressFormat.PNG, 100, it)
-                                    }
-                                    Log.d(TAG, "Image Captured: ${photoFile.absolutePath}, time to save: ${currentTimeMillis() - timeToSaveImage}ms")
-                                } catch (ioex: IOException) {
-                                    Log.e(TAG, "Unable to write DNG image to file", ioex)
-                                } catch (iaex: IllegalArgumentException) {
-                                    Log.w(TAG, "Unable to write DNG image to file as no pixels available.", iaex)
+                                    bmp.compress(Bitmap.CompressFormat.PNG, 100, it)
                                 }
+                                Log.d(TAG, "Image Captured: ${photoFile.absolutePath}, time to save: ${currentTimeMillis() - timeToSaveImage}ms")
+                            } catch (ioex: IOException) {
+                                Log.e(TAG, "Unable to write image to file", ioex)
+                            } catch (iaex: IllegalArgumentException) {
+                                Log.w(TAG, "Unable to write image to file as no pixels available.", iaex)
                             }
                         }
                         val now = currentTimeMillis()
@@ -347,6 +311,23 @@ class CameraProcessor(private val appContext: Context): DataCollector {
         private const val WIDTH = 1080
         private const val HEIGHT = 1920
         private const val SENSOR_ROTATION_COMPENSATION = -90F
+
+        @Suppress("NAME_SHADOWING")
+        fun getRGB(y: Int, v: Int, u: Int): Int {
+            val r = (y + (1.402/*1.370705*/ * v)).toInt().let {
+                if (it > 255) 255 else if (it < 0) 0 else it
+            }// ((Y + 1.370705 * (Cr-128)).toInt())
+            val g = (y - (0.714/*0.698001f*/ * v) - (0.344/*0.337633f*/ * u)).toInt().let {
+                if (it > 255) 255 else if (it < 0) 0 else it
+            }// ((Y - (0.698001 * (Cr-128)) - (0.337633 * (Cb-128))).toInt())
+            val b = (y + (1.772/*1.732446f*/ * u)).toInt().let {
+                if (it > 255) 255 else if (it < 0) 0 else it
+            }// ((Y + (1.732446 * (Cb-128))).toInt())
+            return (0xFF shl 24) +
+                   (/*y*/b shl 16) +
+                   (/*y*/g shl 8) +
+                   (/*y*/r)
+        }
 
         // Taken from https://stackoverflow.com/a/56812799
         fun imageToBitmap(image: Image): Bitmap {

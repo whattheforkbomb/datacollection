@@ -15,9 +15,9 @@ import com.whattheforkbomb.collection.R
 import com.whattheforkbomb.collection.databinding.ActivityMainBinding
 import com.whattheforkbomb.collection.services.*
 import com.whattheforkbomb.collection.viewmodels.DataCollectionViewModel
-import org.opencv.android.BaseLoaderCallback
-import org.opencv.android.LoaderCallbackInterface
-import org.opencv.android.OpenCVLoader
+//import org.opencv.android.BaseLoaderCallback
+//import org.opencv.android.LoaderCallbackInterface
+//import org.opencv.android.OpenCVLoader
 import java.nio.file.Paths
 import kotlin.io.path.pathString
 

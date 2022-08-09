@@ -53,7 +53,7 @@ class CameraProcessor(private val appContext: Context): DataCollector {
     @SuppressLint("MissingPermission")
     override fun setup(onReadyCallback: (setupSuccessful: Boolean) -> Unit) {
         executor = Executors.newSingleThreadExecutor()
-        fileSavingExecutor = Executors.newFixedThreadPool(1)
+        fileSavingExecutor = Executors.newFixedThreadPool(4)
         setupCamera2Images()
         onCamera2ReadyCallback = onReadyCallback
     }
@@ -106,7 +106,7 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                 val sizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)!!
                     .getOutputSizes(format)
                 Log.i(TAG, "Possible sizes: ${sizes.joinToString()}")
-                imageReader = ImageReader.newInstance(1920, 1080, format, IMAGE_BUFFER_SIZE)
+                imageReader = ImageReader.newInstance(1280, 720, format, IMAGE_BUFFER_SIZE)
                 createCaptureSession(camera2!!, imageReader!!.surface)
                 Log.i(TAG, "Camera: $frontCameraId Opened")
             }
@@ -177,7 +177,7 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                         var yuvBytes: ByteArray? = ByteArray(size)
                         image.planes[0].buffer.apply {
                             rewind()
-                            Log.i(TAG, "y buffer size: ${remaining()}")
+//                            Log.i(TAG, "y buffer size: ${remaining()}")
                             get(yuvBytes!!)
                         }
 //                        image.planes[2].apply {
@@ -266,17 +266,20 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                             }
                             yuvBytes = null
                             val bmp = Bitmap.createBitmap(rgb!!, HEIGHT, WIDTH, Bitmap.Config.ARGB_8888)
-//                            bmp.copyPixelsFromBuffer(IntBuffer.wrap(rgb!!))
                             rgb = null
+                            val mat = Matrix()
+                            mat.postRotate(-90F)
+                            val rotatedBmp = Bitmap.createBitmap(bmp, 0,0, HEIGHT, WIDTH, mat, true)
+                            bmp.recycle()
                             val photoFile = File(Paths.get(photoPath, "$timestamp$extension").toUri())
-                            val timeToSaveImage = currentTimeMillis()
+//                            val timeToSaveImage = currentTimeMillis()
                             try {
-                                Log.i(TAG, "Saving file")
+//                                Log.i(TAG, "Saving file")
                                 FileOutputStream(photoFile).use {
 //                                        yuvImage.compressToJpeg(Rect(0, 0, yuvImage.width, yuvImage.height), 100, it)
-                                    bmp.compress(Bitmap.CompressFormat.PNG, 100, it)
+                                    rotatedBmp.compress(Bitmap.CompressFormat.PNG, 100, it)
                                 }
-                                Log.d(TAG, "Image Captured: ${photoFile.absolutePath}, time to save: ${currentTimeMillis() - timeToSaveImage}ms")
+//                                Log.d(TAG, "Image Captured: ${photoFile.absolutePath}, time to save: ${currentTimeMillis() - timeToSaveImage}ms")
                             } catch (ioex: IOException) {
                                 Log.e(TAG, "Unable to write image to file", ioex)
                             } catch (iaex: IllegalArgumentException) {
@@ -284,7 +287,7 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                             }
                         }
                         val now = currentTimeMillis()
-                        Log.d(TAG, "Time Taken To Process Image: ${now - timeToProcessImage}ms, time since last image: ${now - lastPhotoms}")
+//                        Log.d(TAG, "Time Taken To Process Image: ${now - timeToProcessImage}ms, time since last image: ${now - lastPhotoms}")
                         lastPhotoms = now
                     } else {
                         Log.w(TAG, "Unable to save image as none present.")
@@ -304,12 +307,12 @@ class CameraProcessor(private val appContext: Context): DataCollector {
         private const val JPEG_EXT = ".jpeg"
         private const val RAW_EXT = ".dng"
         private const val TAG = "CP"
-        private const val SAMPLE_RATE = 20L//(1000 / 30).toLong()
+        private const val SAMPLE_RATE = 40L//(1000 / 30).toLong()
         private const val IMAGE_BUFFER_SIZE: Int = 3
         private const val RAW_MODE = false
 
-        private const val WIDTH = 1080
-        private const val HEIGHT = 1920
+        private const val WIDTH = 720
+        private const val HEIGHT = 1280
         private const val SENSOR_ROTATION_COMPENSATION = -90F
 
         @Suppress("NAME_SHADOWING")

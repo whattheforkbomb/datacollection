@@ -77,7 +77,8 @@ class DataCollectionFragment : Fragment() {
         override fun onSensorChanged(event: SensorEvent?) {
             if (pendingShake && shakeDetected(event!!.values)) {
                 pendingShake = false
-                startRecording()
+                binding.roundStart.visibility = INVISIBLE
+                reset(DEFAULT_MOTION)
             }
         }
 
@@ -98,7 +99,7 @@ class DataCollectionFragment : Fragment() {
                         binding.progress.progress = binding.progress.progress - 1
                         remainingGridPoints = previousGridPoints.subList(previousGridPoints.size - remainingGridPoints.size - 1 , previousGridPoints.size)
                         binding.buttonNext.isEnabled = false
-                        binding.buttonNext.text = "Wait"
+                        binding.buttonNext.text = "Record"
                         val layoutParams = FrameLayout.LayoutParams(binding.target.layoutParams)
                         layoutParams.gravity = remainingGridPoints[0].first.layoutGravity
                         binding.target.layoutParams = layoutParams
@@ -137,9 +138,9 @@ class DataCollectionFragment : Fragment() {
     }
 
     private fun setupDataCollection() {
-        pendingShake = true
         binding.timer.visibility = INVISIBLE
-        binding.recordingState.text = "PENDING SHAKE"
+        binding.recordingState.setTextColor(Color.WHITE)
+        binding.recordingState.text = "Press Record Button To Start"
         binding.recordingState.visibility = VISIBLE
         binding.target.scaleX = 1.0F
         binding.target.scaleY = 1.0F
@@ -167,9 +168,13 @@ class DataCollectionFragment : Fragment() {
         if (remainingGridPoints[0].first.animated) setAnimation(remainingGridPoints[0].first)
 
         // Nav
+        binding.buttonNext.isEnabled = true
         binding.buttonNext.setOnClickListener {
-            timer.cancel()
-            nextMotion()
+            startRecording()
+            binding.buttonNext.setOnClickListener {
+                timer.cancel()
+                nextMotion()
+            }
         }
     }
 
@@ -215,7 +220,7 @@ class DataCollectionFragment : Fragment() {
 
     private fun nextMotion() {
         binding.buttonNext.isEnabled = false
-        binding.buttonNext.text = "Wait"
+        binding.buttonNext.text = "Record"
         recording=false
         model.dataCollectionService.stop()
         binding.progress.progress = binding.progress.progress + 1
@@ -231,7 +236,10 @@ class DataCollectionFragment : Fragment() {
                 reset(nextMotion)
             } else if(repetitions < 5) {
                 repetitions++
-                reset(DEFAULT_MOTION)
+                pendingShake = true
+                binding.roundStartText.text = "Round ${repetitions+1}/5\n\nPlease Shake The Phone To Begin"
+                binding.roundStart.visibility = VISIBLE
+                binding.dataCollection.visibility = INVISIBLE
             } else {
                 findNavController().navigate(R.id.nav_to_finish)
             }
@@ -240,9 +248,17 @@ class DataCollectionFragment : Fragment() {
             binding.timer.visibility = INVISIBLE
             binding.recordingState.text = "NEXT MOTION"
             binding.recordingState.visibility = VISIBLE
+            binding.buttonNext.isEnabled = false
+            binding.buttonNext.setOnClickListener {
+                startRecording()
+                binding.buttonNext.setOnClickListener {
+                    timer.cancel()
+                    nextMotion()
+                }
+            }
             getTimer(2) {
-                binding.recordingState.text = "PENDING SHAKE"
-                pendingShake = true
+                binding.recordingState.text = "Press Record Button To Start"
+                binding.buttonNext.isEnabled = true
             }.start()
             remainingGridPoints = remainingGridPoints.subList(1, remainingGridPoints.size)
 
@@ -259,32 +275,26 @@ class DataCollectionFragment : Fragment() {
 
     private fun startRecording() {
         instructionsView.stopVideo()
-        binding.timer.visibility = VISIBLE
-        binding.recordingState.visibility = INVISIBLE
-        getTimer(3) {
-            binding.timer.visibility = INVISIBLE
-            binding.recordingState.visibility = VISIBLE
-            binding.recordingState.text = "RECORDING"
-            binding.recordingState.setTextColor(Color.RED)
+        binding.recordingState.text = "RECORDING"
+        binding.recordingState.setTextColor(Color.RED)
 
-            recording = true
-            model.dataCollectionService.start(repetitions, selectedMotion, remainingGridPoints[0].first)
-            timer = getTimer(2) {
-                binding.buttonNext.isEnabled = true
-                binding.buttonNext.text = "Stop Recording"
-                timer = getTimer(8) {
-                    Toast.makeText(
-                        activity!!.applicationContext,
-                        "Recording Stopped Automatically As Over 10 Seconds Had Elapsed.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    nextMotion()
-                }
-                timer.start()
+        recording = true
+        model.dataCollectionService.start(repetitions, selectedMotion, remainingGridPoints[0].first)
+        binding.buttonNext.isEnabled = false
+        binding.buttonNext.text = "Stop Recording"
+        timer = getTimer(1) {
+            binding.buttonNext.isEnabled = true
+            timer = getTimer(6) {
+                Toast.makeText(
+                    activity!!.applicationContext,
+                    "Recording Stopped Automatically As Over 7 Seconds Had Elapsed.",
+                    Toast.LENGTH_LONG
+                ).show()
+                nextMotion()
             }
-
             timer.start()
-        }.start()
+        }
+        timer.start()
     }
 
     private fun getTimer(sec: Long, onFinishCallback: () -> Unit): CountDownTimer {
@@ -404,34 +414,37 @@ class DataCollectionFragment : Fragment() {
         binding.timeRemaining = TimeRemaining(0, 0)
         sensorManager = activity!!.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        if (!readyToRecord) executor.execute {
-            model.dataCollectionService.setup {
-                sensorManager.registerListener(shakeDetector, accelerometerSensor, SensorManager.SENSOR_DELAY_UI)
-                activity!!.runOnUiThread {
-                    readyToRecord = it
-                    val toast = if (!it) {
-                        Log.e(TAG, "Failed to start data collectors")
-                        Toast.makeText(
-                            activity!!.applicationContext,
-                            "Unable to successfully start data collectors... Please check logs and restart.",
-                            Toast.LENGTH_LONG
-                        )
-                    } else {
-                        Toast.makeText(
-                            activity!!.applicationContext,
-                            "Ready to begin recording",
-                            Toast.LENGTH_LONG
-                        )
+        sensorManager.registerListener(shakeDetector, accelerometerSensor, SensorManager.SENSOR_DELAY_UI)
+        if (!readyToRecord) {
+            binding.roundStartText.text = "Preparing For Data Collection\n\nPlease Wait..."
+            executor.execute {
+                model.dataCollectionService.setup {
+                    activity!!.runOnUiThread {
+                        binding.roundStartText.text = "Round $repetitions/5\n\nPlease Shake The Phone To Begin"
+                        readyToRecord = it
+                        pendingShake = true
+//                    val toast = if (!it) {
+//                        Log.e(TAG, "Failed to start data collectors")
+//                        Toast.makeText(
+//                            activity!!.applicationContext,
+//                            "Unable to successfully start data collectors... Please check logs and restart.",
+//                            Toast.LENGTH_LONG
+//                        )
+//                    } else {
+//                        Toast.makeText(
+//                            activity!!.applicationContext,
+//                            "Ready to begin recording",
+//                            Toast.LENGTH_LONG
+//                        )
+//                    }
+//                    toast.show()
                     }
-                    toast.show()
                 }
             }
-        } else {
-            sensorManager.registerListener(shakeDetector, accelerometerSensor, SensorManager.SENSOR_DELAY_UI)
         }
         binding.buttonNext.isEnabled = false
-        binding.buttonNext.text = "Wait"
-        reset(selectedMotion)
+        binding.buttonNext.text = "Record"
+
 //        instructionsView = parentFragmentManager.findFragmentByTag(INSTRUCTIONS_FRAGMENT_TAG) as InstructionsView
     }
 

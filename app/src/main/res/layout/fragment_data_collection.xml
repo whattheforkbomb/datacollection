@@ -12,7 +12,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:visibility="visible">
+            android:visibility="invisible">
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
@@ -160,6 +160,23 @@
                 android:paddingBottom="10dp"
                 android:visibility="invisible"
                 app:srcCompat="@drawable/ic_baseline_fiber_manual_record_24" />
+        </FrameLayout>
+        <FrameLayout
+            android:id="@+id/roundStart"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="visible"
+            android:padding="10dp" >
+            <TextView
+                android:id="@+id/roundStartText"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:autoSizeMaxTextSize="50sp"
+                android:autoSizeMinTextSize="12sp"
+                android:autoSizeStepGranularity="2sp"
+                android:autoSizeTextType="uniform" />
         </FrameLayout>
     </FrameLayout>
 </layout>

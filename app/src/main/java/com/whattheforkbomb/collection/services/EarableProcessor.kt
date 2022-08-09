@@ -71,7 +71,7 @@ class EarableProcessor(private val appContext: Context) : DataCollector {
         fw.appendLine(ESenseEvent.HEADER)
         fileWriter = fw
         eSenseManager?.registerSensorListener({ eSenseEvent: ESenseEvent ->
-            Log.d(TAG, "ESense Event received.")
+//            Log.d(TAG, "ESense Event received.")
             if (!closing) {
                 fw.appendLine(eSenseEvent.toCSV(esenseConfig!!))
                 fw.flush()

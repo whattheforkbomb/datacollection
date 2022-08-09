@@ -267,17 +267,18 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                             yuvBytes = null
                             val bmp = Bitmap.createBitmap(rgb!!, HEIGHT, WIDTH, Bitmap.Config.ARGB_8888)
                             rgb = null
-                            val mat = Matrix()
-                            mat.postRotate(-90F)
-                            val rotatedBmp = Bitmap.createBitmap(bmp, 0,0, HEIGHT, WIDTH, mat, true)
-                            bmp.recycle()
+//                            val mat = Matrix()
+//                            mat.postRotate(-90F)
+//                            val rotatedBmp = Bitmap.createBitmap(bmp, 0,0, HEIGHT, WIDTH, mat, true)
+//                            bmp.recycle()
                             val photoFile = File(Paths.get(photoPath, "$timestamp$extension").toUri())
 //                            val timeToSaveImage = currentTimeMillis()
                             try {
 //                                Log.i(TAG, "Saving file")
                                 FileOutputStream(photoFile).use {
 //                                        yuvImage.compressToJpeg(Rect(0, 0, yuvImage.width, yuvImage.height), 100, it)
-                                    rotatedBmp.compress(Bitmap.CompressFormat.PNG, 100, it)
+                                    bmp/*rotatedBmp*/.compress(Bitmap.CompressFormat.PNG, 100, it)
+                                    bmp.recycle()
                                 }
 //                                Log.d(TAG, "Image Captured: ${photoFile.absolutePath}, time to save: ${currentTimeMillis() - timeToSaveImage}ms")
                             } catch (ioex: IOException) {
@@ -307,7 +308,7 @@ class CameraProcessor(private val appContext: Context): DataCollector {
         private const val JPEG_EXT = ".jpeg"
         private const val RAW_EXT = ".dng"
         private const val TAG = "CP"
-        private const val SAMPLE_RATE = 40L//(1000 / 30).toLong()
+        private const val SAMPLE_RATE = 45L//(1000 / 30).toLong()
         private const val IMAGE_BUFFER_SIZE: Int = 3
         private const val RAW_MODE = false
 

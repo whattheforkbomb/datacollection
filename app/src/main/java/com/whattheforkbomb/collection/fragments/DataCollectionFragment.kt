@@ -30,10 +30,15 @@ import com.whattheforkbomb.collection.data.Instructions
 import com.whattheforkbomb.collection.data.TimeRemaining
 import com.whattheforkbomb.collection.databinding.FragmentDataCollectionBinding
 import com.whattheforkbomb.collection.viewmodels.DataCollectionViewModel
+import java.io.File
+import java.io.FileWriter
+import java.nio.file.Paths
+import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import kotlin.concurrent.fixedRateTimer
+import kotlin.io.path.pathString
 import kotlin.math.ceil
 import kotlin.math.sqrt
 
@@ -72,10 +77,18 @@ class DataCollectionFragment : Fragment() {
             field = value
         }
 
+    private lateinit var shakeDetectorFilePath: File
     // TODO: check that direction changed twice with threshold exceeded within 1-2sec(?), not just once.
     private val shakeDetector = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent?) {
             if (pendingShake && shakeDetected(event!!.values)) {
+                val timestampFormat = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS")
+                timestampFormat.timeZone = TimeZone.getTimeZone("UTC")
+                val timestamp = timestampFormat.format(Date())
+                FileWriter(shakeDetectorFilePath, true).use {
+                    it.appendLine("$timestamp,${event.values[0]},${event.values[1]},${event.values[2]}")//,${event.values[3]},${event.values[4]},${event.values[0]}")
+                    it.flush()
+                }
                 pendingShake = false
                 binding.roundStart.visibility = INVISIBLE
                 reset(DEFAULT_MOTION)
@@ -409,11 +422,17 @@ class DataCollectionFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         activity!!.actionBar?.setDisplayHomeAsUpEnabled(false)
+        shakeDetectorFilePath = Paths.get(model.rootDir.pathString, model.dataCollectionService.getParticipantId().toString(), "ShakeDetected.csv").toFile()
+        FileWriter(shakeDetectorFilePath, true).use {
+            it.appendLine("TIMESTAMP,X_RAW,Y_RAW,Z_RAW,X,Y,Z")
+            it.flush()
+
+        }
         Log.i(TAG, "Motion: $selectedMotion")
         readyToRecord = model.dataCollectionService.ready
         binding.timeRemaining = TimeRemaining(0, 0)
         sensorManager = activity!!.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
         sensorManager.registerListener(shakeDetector, accelerometerSensor, SensorManager.SENSOR_DELAY_UI)
         if (!readyToRecord) {
             binding.roundStartText.text = "Preparing For Data Collection\n\nPlease Wait..."

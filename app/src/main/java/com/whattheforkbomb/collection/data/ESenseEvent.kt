@@ -38,7 +38,7 @@ data class ESenseEvent (
     }
 
     fun toCSV(config: ESenseConfig): String {
-        val timestampFormat = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS")
+        val timestampFormat = SimpleDateFormat("yyyy-MM-dd'T'HH-mm-ss-SSS")
         timestampFormat.timeZone = TimeZone.getTimeZone("UTC")
         timestampFormat.format(Date(timestamp))
         val accelG = convertAccToG(config)

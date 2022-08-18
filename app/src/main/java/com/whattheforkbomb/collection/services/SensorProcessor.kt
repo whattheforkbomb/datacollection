@@ -125,7 +125,7 @@ class SensorProcessor(private val sensorManager: SensorManager) : DataCollector 
                         ), Vector3D(rawGyroVector[3], rawGyroVector[4], rawGyroVector[5])
                     ),
                 )
-                val timestamp = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS")
+                val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH-mm-ss-SSS")
                 timestamp.timeZone = TimeZone.getTimeZone("UTC")
                 fw.appendLine(data.toCSV(timestamp.format(Date())))
                 fw.flush()

@@ -82,7 +82,7 @@ class DataCollectionFragment : Fragment() {
     private val shakeDetector = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent?) {
             if (pendingShake && shakeDetected(event!!.values)) {
-                val timestampFormat = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS")
+                val timestampFormat = SimpleDateFormat("yyyy-MM-dd'T'HH-mm-ss-SSS")
                 timestampFormat.timeZone = TimeZone.getTimeZone("UTC")
                 val timestamp = timestampFormat.format(Date())
                 FileWriter(shakeDetectorFilePath, true).use {
@@ -561,8 +561,8 @@ class DataCollectionFragment : Fragment() {
                 override fun getTargets() = EDGE_GRID_POINTS.zip(listOf(
                     Instructions(R.raw.head_rotate_topcentre, R.drawable.direction_up, "Look Up\n\nYour Nose Should Be Pointing Above The Top Of The Phone.", R.string.rotate_head_instructions, R.drawable.head_rotate_alignment),
                     Instructions(R.raw.head_rotate_midright, R.drawable.direction_right, "Look Right\n\nYour Nose Should Be Pointing Beyond The Right Of The Phone.", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
-                    Instructions(R.raw.head_rotate_bottomcentre, R.drawable.direction_left, "Look Down\n\nYour Nose Should Be Pointing Below The Bottom Of The Phone.", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
-                    Instructions(R.raw.head_rotate_midleft, R.drawable.direction_down, "Look Left\n\nYour Nose Should Be Pointing Beyond The Left Of The Phone.", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.head_rotate_bottomcentre, R.drawable.direction_down, "Look Down\n\nYour Nose Should Be Pointing Below The Bottom Of The Phone.", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.head_rotate_midleft, R.drawable.direction_left, "Look Left\n\nYour Nose Should Be Pointing Beyond The Left Of The Phone.", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
                 ))
             },
             ROTATE_PHONE_ROLL {

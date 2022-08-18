@@ -60,10 +60,13 @@ class CameraProcessor(private val appContext: Context): DataCollector {
 
     // false means unable to start
     override fun start(rootDir: String): Boolean {
+        // TODO: Check if atomic int has value
         val photoPath = Paths.get(rootDir, IMAGES_DIR)
         photoPath?.toFile()?.mkdirs()
         return camera2ImageCapture(photoPath.pathString)
     }
+
+    // TODO: add method to 'wait' for job to finish, probs add to interface also
 
     override fun stop(): Boolean {
         captureSession?.stopRepeating()
@@ -171,6 +174,8 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                 if (camera2ShouldCapture) {
                     val image = imageReader?.acquireNextImage()
                     if (image != null) {
+
+                        // TODO: increment atomic int
                         camera2ShouldCapture = false
                         val timeToProcessImage = currentTimeMillis()
                         val size = WIDTH*HEIGHT
@@ -191,7 +196,7 @@ class CameraProcessor(private val appContext: Context): DataCollector {
 ////                            Log.i(TAG, "U Row Stride: $rowStride, Pixel Stride: $pixelStride, ${buffer.get(0)}, ${buffer.get(1)} ${buffer.get(2)} ${buffer.get(3)}")
 //                        }
                         image.close()
-                        val timestampFormat = SimpleDateFormat("yyyy-MMM-dd'T'HH:mm:ss.SSS")
+                        val timestampFormat = SimpleDateFormat("yyyy-MM-dd'T'HH-mm-ss-SSS")
                         timestampFormat.timeZone = TimeZone.getTimeZone("UTC")
                         val timestamp = timestampFormat.format(Date())
                         fileSavingExecutor.submit {
@@ -280,6 +285,7 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                                     bmp/*rotatedBmp*/.compress(Bitmap.CompressFormat.PNG, 100, it)
                                     bmp.recycle()
                                 }
+                                // TODO: decrement atomic int
 //                                Log.d(TAG, "Image Captured: ${photoFile.absolutePath}, time to save: ${currentTimeMillis() - timeToSaveImage}ms")
                             } catch (ioex: IOException) {
                                 Log.e(TAG, "Unable to write image to file", ioex)

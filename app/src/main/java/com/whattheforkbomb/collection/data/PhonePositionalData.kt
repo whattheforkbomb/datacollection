@@ -27,8 +27,8 @@ data class PhonePositionalData(
 ) {
     fun toCSV(timeStamp: String): String =
         "$timeStamp,${linearAcceleration.x},${linearAcceleration.y},${linearAcceleration.z},${rotation.x},${rotation.y},${rotation.z},${rotation.scalar}," +
-                "${acceleration.x},${acceleration.y},${acceleration.z},${gyroscope.x},${gyroscope.y},${gyroscope.z}" +
-                "${rawAccelerometer.rawOutput.x},${rawAccelerometer.rawOutput.y},${rawAccelerometer.rawOutput.z},${rawAccelerometer.estimatedDrift.x},${rawAccelerometer.estimatedDrift.y},${rawAccelerometer.estimatedDrift.z}" +
+                "${acceleration.x},${acceleration.y},${acceleration.z},${gyroscope.x},${gyroscope.y},${gyroscope.z}," +
+                "${rawAccelerometer.rawOutput.x},${rawAccelerometer.rawOutput.y},${rawAccelerometer.rawOutput.z},${rawAccelerometer.estimatedDrift.x},${rawAccelerometer.estimatedDrift.y},${rawAccelerometer.estimatedDrift.z}," +
                 "${rawGyroscope.rawOutput.x},${rawGyroscope.rawOutput.y},${rawGyroscope.rawOutput.z},${rawGyroscope.estimatedDrift.x},${rawGyroscope.estimatedDrift.y},${rawGyroscope.estimatedDrift.z}"
 
     companion object {

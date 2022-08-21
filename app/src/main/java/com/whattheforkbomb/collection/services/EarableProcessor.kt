@@ -9,6 +9,8 @@ import io.esense.esenselib.ESenseManager
 import java.io.File
 import java.io.FileWriter
 import java.nio.file.Paths
+import java.util.*
+import kotlin.concurrent.fixedRateTimer
 
 class EarableProcessor(private val appContext: Context) : DataCollector {
 
@@ -19,6 +21,9 @@ class EarableProcessor(private val appContext: Context) : DataCollector {
     @Volatile private var ready: Boolean = false
     @Volatile private var writing = false
     @Volatile private var closing = false
+
+    private var timer: Timer? = null
+    @Volatile private var eSenseData: ESenseEvent = ESenseEvent()
 
     override fun setup(onReadyCallback: (setupSuccessful: Boolean) -> Unit) {
         val listener = object : ESenseConnectionListener {
@@ -38,6 +43,18 @@ class EarableProcessor(private val appContext: Context) : DataCollector {
                 esenseConfig = config
                 eSenseManager = manager
                 ready = true
+                eSenseManager?.registerSensorListener({ eSenseEvent: ESenseEvent ->
+//                    Log.d(TAG, "ESense Event received.")
+                    eSenseData = eSenseEvent
+//                    if (closing) {
+//                        writing = false
+//                        fileWriter?.close()
+//                        closing = false
+//                    } else if (writing) {
+//                        fileWriter!!.appendLine(eSenseData.toCSV(esenseConfig!!))
+//                        fileWriter!!.flush()
+//                    }
+                }, 100)
                 onReadyCallback(ready)
             }
 
@@ -57,19 +74,6 @@ class EarableProcessor(private val appContext: Context) : DataCollector {
             // not already connected,
             manager.connect(CONNECTION_TIMEOUT)
         }
-
-        eSenseManager?.registerSensorListener({ eSenseEvent: ESenseEvent ->
-//            Log.d(TAG, "ESense Event received.")
-            if (!closing) {
-                if (writing) {
-                    fileWriter!!.appendLine(eSenseEvent.toCSV(esenseConfig!!))
-                    fileWriter!!.flush()
-                }
-            } else {
-                fileWriter?.close()
-                writing = false
-            }
-        }, SAMPLING_RATE)
     }
 
     override fun start(rootDir: String): Boolean {
@@ -82,15 +86,24 @@ class EarableProcessor(private val appContext: Context) : DataCollector {
         csvFile.createNewFile()
         fileWriter = FileWriter(csvFile)
         fileWriter!!.appendLine(ESenseEvent.HEADER)
+        timer = fixedRateTimer("PushLatestPosData", true, 0L, (1000 / SAMPLING_RATE).toLong()) {
+            if (closing) {
+                fileWriter?.close()
+                writing = false
+            } else if (writing) {
+                fileWriter!!.appendLine(eSenseData.toCSV(esenseConfig!!))
+                fileWriter!!.flush()
+            }
+        }
         writing = true
 
         return true
     }
 
     override fun stop(onStoppedCallback: (stopSuccessful: Boolean) -> Unit): Boolean {
-        eSenseManager?.unregisterSensorListener()
         closing = true
-
+        timer?.cancel()
+        onStoppedCallback(true)
         return true
     }
 

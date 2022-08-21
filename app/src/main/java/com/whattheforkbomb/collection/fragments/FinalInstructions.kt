@@ -61,7 +61,7 @@ class FinalInstructions : Fragment() {
             }
             binding.buttonNext.isEnabled = false
             binding.buttonNext.visibility = INVISIBLE
-            binding.textviewFirst.text = "Thank you for participating in the study. Please continue to debrief with a researcher."
+            binding.textviewFirst.text = getString(R.string.exit_instructions)
             binding.checkbox.isEnabled = false
             binding.checkbox.visibility = INVISIBLE
         }

@@ -38,13 +38,13 @@ class MainActivity : AppCompatActivity() {
         model.dataCollectionService = DataCollectionService.Builder(filePath, this)
             .registerDataCollector(CameraProcessor(applicationContext))
             .registerDataCollector(SensorProcessor(getSystemService(Context.SENSOR_SERVICE) as SensorManager))
-            .registerDataCollector(EarableProcessor(applicationContext))
+//            .registerDataCollector(EarableProcessor(applicationContext))
             .build()
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        longRunningSensorRecorder.start(Paths.get(filePath.pathString, model.dataCollectionService.getParticipantId().toString()).pathString)
+//        longRunningSensorRecorder.start(Paths.get(filePath.pathString, model.dataCollectionService.getParticipantId().toString()).pathString)
 //        OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_4_0, applicationContext, object : BaseLoaderCallback(this) {
 //            override fun onManagerConnected(status: Int) {
 //                when (status) {

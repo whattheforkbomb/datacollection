@@ -204,8 +204,8 @@ class DataCollectionFragment : Fragment() {
             remainingGridPoints = listOf(remainingGridPoints.last())
         }
 
-        activity!!.title = "Data Collection Stage ${selectedMotion.ordinal+1}/${Motions.values().size} - Attempt ${repetitions+1}/5"
-        Log.i(TAG, "Remaining GridPoints: ${remainingGridPoints.joinToString()}")
+        activity!!.title = "Data Collection Stage ${selectedMotion.ordinal+1}/${Motions.values().size} - Attempt ${repetitions+1}/$REPETITIONS_TO_PERFORM"
+        Log.i(TAG, "Remaining GridPoints: ${remainingGridPoints.size}")
 
         val currentInstructions = remainingGridPoints[0].second
         if (currentInstructions.alignmentGuideTextId != NO_ALIGNMENT_INSTRCUTIONS) {
@@ -231,15 +231,9 @@ class DataCollectionFragment : Fragment() {
         }
     }
 
-    private fun nextMotion() {
-        binding.buttonNext.isEnabled = false
-        binding.buttonNext.text = "Record"
-        recording=false
-        model.dataCollectionService.stop({stopped: Boolean -> Log.i(TAG, "Collectors stopped $stopped")})
-        binding.progress.progress = binding.progress.progress + 1
-        binding.target.scaleX = 1.0F
-        binding.target.scaleY = 1.0F
-        binding.recordingState.setTextColor(Color.WHITE)
+    private fun onStopCallback(stopped: Boolean) = activity!!.runOnUiThread {
+        System.gc()
+        Log.i(TAG, "Collectors stopped: $stopped")
         if (remainingGridPoints.size == 1) {
             val nextMotion = selectedMotion.getNext()
             animationTimer?.cancel()
@@ -247,43 +241,91 @@ class DataCollectionFragment : Fragment() {
             binding.animatedTarget.visibility = INVISIBLE
             if (nextMotion != null) {
                 reset(nextMotion)
-            } else if(repetitions < 5) {
+            } else if(repetitions < REPETITIONS_TO_PERFORM) {
                 repetitions++
                 pendingShake = true
-                binding.roundStartText.text = "Round ${repetitions+1}/5\n\nPlease Shake The Phone To Begin"
+                binding.roundStartText.text = "Round ${repetitions+1}/$REPETITIONS_TO_PERFORM\n\nPlease Shake The Phone To Begin"
                 binding.roundStart.visibility = VISIBLE
                 binding.dataCollection.visibility = INVISIBLE
             } else {
                 findNavController().navigate(R.id.nav_to_finish)
             }
         } else {
-            val layoutParams = FrameLayout.LayoutParams(binding.target.layoutParams)
-            binding.timer.visibility = INVISIBLE
-            binding.recordingState.text = "NEXT MOTION"
-            binding.recordingState.visibility = VISIBLE
-            binding.buttonNext.isEnabled = false
-            binding.buttonNext.setOnClickListener {
-                startRecording()
-                binding.buttonNext.setOnClickListener {
-                    timer.cancel()
-                    nextMotion()
-                }
-            }
-            getTimer(2) {
-                binding.recordingState.text = "Press Record Button To Start"
-                binding.buttonNext.isEnabled = true
-            }.start()
             remainingGridPoints = remainingGridPoints.subList(1, remainingGridPoints.size)
+            if (remainingGridPoints[0].second.alignmentGuideTextId != NO_ALIGNMENT_INSTRCUTIONS) {
+                binding.alignmentImage.visibility = INVISIBLE
+                binding.alignmentText.visibility = VISIBLE
+                binding.dataCollection.visibility = INVISIBLE
+                binding.alignmentGuide.visibility = VISIBLE
+                binding.alignmentImage.setImageResource(remainingGridPoints[0].second.alignmentGuideImageId)
+                binding.alignmentText.setText(remainingGridPoints[0].second.alignmentGuideTextId)
 
-            layoutParams.gravity = remainingGridPoints[0].first.layoutGravity
-            binding.target.layoutParams = layoutParams
-            binding.target.visibility = VISIBLE
-            instructionsView.updateInstructions(remainingGridPoints[0].second)
+                binding.alignmentNext.setOnClickListener {
+                    if (binding.alignmentImage.visibility == INVISIBLE) {
+                        binding.alignmentText.visibility = INVISIBLE
+                        binding.alignmentImage.visibility = VISIBLE
+                    } else {
+                        binding.alignmentGuide.visibility = INVISIBLE
+                        binding.dataCollection.visibility = VISIBLE
+                        val layoutParams = FrameLayout.LayoutParams(binding.target.layoutParams)
+                        binding.timer.visibility = INVISIBLE
+                        binding.recordingState.text = "Press Record Button To Start"
+                        binding.recordingState.visibility = VISIBLE
+                        binding.buttonNext.isEnabled = true
+                        binding.buttonNext.setOnClickListener {
+                            startRecording()
+                            binding.buttonNext.setOnClickListener {
+                                timer.cancel()
+                                nextMotion()
+                            }
+                        }
 
-            if (remainingGridPoints[0].first.animated) setAnimation(remainingGridPoints[0].first)
+                        layoutParams.gravity = remainingGridPoints[0].first.layoutGravity
+                        binding.target.layoutParams = layoutParams
+                        binding.target.visibility = VISIBLE
+                        instructionsView.updateInstructions(remainingGridPoints[0].second)
 
-            Log.i(TAG, "Current Target Position: ${remainingGridPoints[0].first} - ${remainingGridPoints[0].first.layoutGravity}")
+                        if (remainingGridPoints[0].first.animated) setAnimation(remainingGridPoints[0].first)
+
+                        Log.i(TAG, "Current Target Position: ${remainingGridPoints[0].first} - ${remainingGridPoints[0].first.layoutGravity}")
+                    }
+                }
+            } else {
+                val layoutParams = FrameLayout.LayoutParams(binding.target.layoutParams)
+                binding.timer.visibility = INVISIBLE
+                binding.recordingState.text = "Press Record Button To Start"
+                binding.recordingState.visibility = VISIBLE
+                binding.buttonNext.isEnabled = true
+                binding.buttonNext.setOnClickListener {
+                    startRecording()
+                    binding.buttonNext.setOnClickListener {
+                        timer.cancel()
+                        nextMotion()
+                    }
+                }
+
+                layoutParams.gravity = remainingGridPoints[0].first.layoutGravity
+                binding.target.layoutParams = layoutParams
+                binding.target.visibility = VISIBLE
+                instructionsView.updateInstructions(remainingGridPoints[0].second)
+
+                if (remainingGridPoints[0].first.animated) setAnimation(remainingGridPoints[0].first)
+
+                Log.i(TAG, "Current Target Position: ${remainingGridPoints[0].first} - ${remainingGridPoints[0].first.layoutGravity}")
+            }
         }
+    }
+
+    private fun nextMotion() {
+        binding.buttonNext.isEnabled = false
+        binding.buttonNext.text = "Record"
+        recording=false
+        binding.progress.progress = binding.progress.progress + 1
+        binding.target.scaleX = 1.0F
+        binding.target.scaleY = 1.0F
+        binding.recordingState.setTextColor(Color.WHITE)
+        binding.recordingState.text = "SAVING..."
+        executor.execute { model.dataCollectionService.stop(this::onStopCallback) }
     }
 
     private fun startRecording() {
@@ -428,7 +470,7 @@ class DataCollectionFragment : Fragment() {
             it.flush()
 
         }
-        Log.i(TAG, "Motion: $selectedMotion")
+        Log.i(TAG, "Motion: ${selectedMotion.name}")
         readyToRecord = model.dataCollectionService.ready
         binding.timeRemaining = TimeRemaining(0, 0)
         sensorManager = activity!!.getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -439,7 +481,7 @@ class DataCollectionFragment : Fragment() {
             executor.execute {
                 model.dataCollectionService.setup {
                     activity!!.runOnUiThread {
-                        binding.roundStartText.text = "Round $repetitions/5\n\nPlease Shake The Phone To Begin"
+                        binding.roundStartText.text = "Round ${repetitions+1}/$REPETITIONS_TO_PERFORM\n\nPlease Shake The Phone To Begin"
                         readyToRecord = it
                         pendingShake = true
 //                    val toast = if (!it) {
@@ -477,6 +519,7 @@ class DataCollectionFragment : Fragment() {
         const val NO_ALIGNMENT_INSTRCUTIONS = -1
         private const val SHAKE_THRESHOLD = 2.0
         private const val TAG = "DC"
+        private const val REPETITIONS_TO_PERFORM = 3
 
         enum class Motions {
             POINTING_TRANSLATE_PHONE {
@@ -495,7 +538,7 @@ class DataCollectionFragment : Fragment() {
             POINTING_ROTATE_PHONE {
                 override fun getNext() = POINTING_ROTATE_HEAD
                 override fun getTargets() = POINTING_GRID_POINTS.zip(listOf(
-                    Instructions(R.raw.phone_rotate_pointing_topcentre, R.drawable.direction_down, "${move("Towards Your Nose", "Turn The Top Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_translate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
+                    Instructions(R.raw.phone_rotate_pointing_topcentre, R.drawable.direction_down, "${move("Towards Your Nose", "Turn The Top Edge Of", true)}\n\n$TARGET_NOSE", R.string.pointing_rotate_phone_instructions, R.drawable.phone_rotate_pointing_alignment),
                     Instructions(R.raw.phone_rotate_pointing_topright, R.drawable.direction_down_left, "${move("Towards Your Nose", "Turn The Top Right Corner Of", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
                     Instructions(R.raw.phone_rotate_pointing_midright, R.drawable.direction_left, "${move("Towards Your Nose", "Turn The Right Edge Of", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
                     Instructions(R.raw.phone_rotate_pointing_bottomright, R.drawable.direction_up_left, "${move("Towards Your Nose", "Turn The Bottom Right Corner Of", true)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
@@ -508,7 +551,7 @@ class DataCollectionFragment : Fragment() {
             POINTING_ROTATE_HEAD {
                 override fun getNext() = TRANSLATE_PHONE
                 override fun getTargets() = POINTING_GRID_POINTS.zip(listOf(
-                    Instructions(R.raw.head_rotate_pointing_topcentre, R.drawable.direction_up, "${move("Towards The Top Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
+                    Instructions(R.raw.head_rotate_pointing_topcentre, R.drawable.direction_up, "${move("Towards The Top Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", R.string.pointing_rotate_head_instructions, R.drawable.head_rotate_pointing_alignment),
                     Instructions(R.raw.head_rotate_pointing_topright, R.drawable.direction_up_right, "${move("Towards The Top Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
                     Instructions(R.raw.head_rotate_pointing_midright, R.drawable.direction_right, "${move("Towards The Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),
                     Instructions(R.raw.head_rotate_pointing_bottomright, R.drawable.direction_down_right, "${move("Towards The Bottom Right Of The Phone", "Turn", false)}\n\n$TARGET_NOSE", NO_ALIGNMENT_INSTRCUTIONS, NO_ALIGNMENT_INSTRCUTIONS),

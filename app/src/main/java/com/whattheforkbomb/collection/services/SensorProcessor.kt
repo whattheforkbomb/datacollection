@@ -52,7 +52,7 @@ class SensorProcessor(private val sensorManager: SensorManager) : DataCollector 
                 Log.d(TAG, "accuracy changed")
             }
 
-        }, sensor, SAMPLING_RATE)
+        }, sensor, (1e6 / SAMPLING_RATE).toInt())
     }
 
     private fun registerListeners(): Boolean {
@@ -133,19 +133,20 @@ class SensorProcessor(private val sensorManager: SensorManager) : DataCollector 
                 fileWriter?.close()
             }
         }
-        timer = fixedRateTimer("PushLatestPosData", true, 0L, (SAMPLING_RATE/1000).toLong(), timerTask)
+        timer = fixedRateTimer("PushLatestPosData", true, 0L, (1000 / SAMPLING_RATE).toLong(), timerTask)
         return true
     }
 
     override fun stop(onStoppedCallback: (stopSuccessful: Boolean) -> Unit): Boolean {
         closing = true
         timer?.cancel()
+        onStoppedCallback(true)
         return true
     }
 
     companion object {
         const val TAG = "SP"
         const val FILE_NAME = "IMU_GYRO_DATA.csv"
-        private const val SAMPLING_RATE = (1e6/50).toInt() // 60 times a second (1/60) scaled to microseconds (1e6)
+        private const val SAMPLING_RATE = 50 // 60 times a second (1/60) scaled to microseconds (1e6)
     }
 }

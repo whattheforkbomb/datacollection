@@ -51,8 +51,8 @@ class InitialInstructions : Fragment() {
             findNavController().navigate(R.id.nav_to_stage_1_data_collection)
         }
         val styledText = SpannableString(getString(R.string.disclaimer))
-        styledText.setSpan(StyleSpan(Typeface.BOLD_ITALIC), 91, 104, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        styledText.setSpan(StyleSpan(Typeface.BOLD_ITALIC), 120, 129, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        styledText.setSpan(StyleSpan(Typeface.BOLD_ITALIC), 87, 100, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        styledText.setSpan(StyleSpan(Typeface.BOLD_ITALIC), 116, 124, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         binding.disclaimer.text = styledText
         activity!!.title = "Welcome"
     }

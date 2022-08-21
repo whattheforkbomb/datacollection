@@ -26,7 +26,7 @@
     <!-- Consent -->
     <string name="final_consent">I understand that my likeness has been captured by the front facing camera and that I consent to it being used within the related research, and published alongside the research.</string>
     <string name="disclaimer">
-        As should have been described in the briefing: data collected by this app will include the your likeness, in particular your face, recorded by the front-facing camera.
+        As should have been described in the briefing: data collected by this app will include your likeness, in particular your face, recorded by the front-facing camera.
         \n\nPlease do not over extend/strain yourself performing any motion. All motions performed should be done in such a way that they don\'t cause any discomfort.
         \nIf you need a break between the recordings please inform a researcher.
     </string>
@@ -48,7 +48,9 @@
         You have completed the data collection activities. Thank you.
         \n\nPlease reconfirm that you consent to the usage of the data collected within the study, in particular the capturing of your likeness via the front-facing camera, via the check-box below.
         \nThis is of course if you still consent to this. If you no longer consent, please inform the researcher/s and continue with the below.
-        \n\n\nPlease remove your earpiece and take off the hat/beanie. Ask for assistance if necessary.
+    </string>
+    <string name="exit_instructions">
+        Please remove your earpiece and take off the hat/beanie. Ask for assistance if necessary.
         \nPlease either place the items provided back onto the table, or hand them back to a researcher.
         \nJoin the researcher to go over a debrief, wherein the researchers can answer any further questions, and further explain the use of the data and the goal of the research.
     </string>

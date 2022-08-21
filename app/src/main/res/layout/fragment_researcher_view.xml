@@ -5,15 +5,34 @@
     android:layout_height="match_parent"
     tools:context=".fragments.ResearcherView">
 
-    <!-- TODO: Update blank fragment layout -->
-    <TextView
-        android:id="@+id/text"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:layout_marginBottom="50dp"
-        android:textAlignment="center"
-        android:textSize="20sp" />
+        android:orientation="horizontal">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_weight="0.1"
+            android:layout_height="wrap_content"
+            android:gravity="left"
+            android:layout_marginBottom="50dp"
+            android:textSize="20sp"
+            android:layout_marginRight="10dp"
+            android:layout_marginLeft="10dp"
+            android:text="PID:"/>
+        <EditText
+            android:id="@+id/text"
+            android:layout_width="0dp"
+            android:layout_weight="0.9"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textAlignment="center"
+            android:textSize="20sp"
+            android:inputType="number"
+            android:layout_marginRight="10dp"
+            android:autofillHints="Participant ID" />
+    </LinearLayout>
     <Button
         android:id="@+id/button_next"
         android:layout_width="wrap_content"

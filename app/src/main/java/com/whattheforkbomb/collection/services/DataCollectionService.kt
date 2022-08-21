@@ -14,27 +14,26 @@ import kotlin.io.path.pathString
 
 class DataCollectionService private constructor(private val rootDir: Path, private val dataCollectors: Set<DataCollector>, private val activity: Activity) {
 
-    private lateinit var participantId: UUID
+    private var participantId: Int? = null
     private lateinit var filePath: Path
     var ready: Boolean = false
         private set
-    private val latch = CountDownLatch(dataCollectors.size)
     @Volatile private var running = false
     val permissionsService = PermissionsService()
 
-    init {
-        generateNewParticipantId()
-    }
+//    init {
+//        generateNewParticipantId()
+//    }
 
-    fun getParticipantId(): UUID {
+    fun getParticipantId(): Int? {
         return participantId
     }
 
-    fun generateNewParticipantId(): UUID { // call on app reset?
-        participantId = UUID.randomUUID()
+    fun setParticipantId(id: Int): Int { // call on app reset?
+        participantId = id
         filePath = Paths.get(rootDir.pathString, participantId.toString())
         filePath.toFile().mkdirs()
-        return participantId
+        return participantId!!
     }
 
     /* TODO:
@@ -59,7 +58,8 @@ class DataCollectionService private constructor(private val rootDir: Path, priva
         }
     }
 
-    fun stop(onStoppedCallback: (Boolean) -> Unit): Boolean {
+    fun stop(onStoppedCallback: (Boolean) -> Unit) = runBlocking {
+        val latch = CountDownLatch(dataCollectors.size)
         val success = ConcurrentHashMap<DataCollector, Boolean>()
 
         dataCollectors.parallelStream().forEach { collector ->
@@ -71,7 +71,7 @@ class DataCollectionService private constructor(private val rootDir: Path, priva
             }
         }
         try {
-            latch.await(10, TimeUnit.SECONDS)
+            latch.await(15, TimeUnit.SECONDS)
         } catch (iex: InterruptedException) {
             // Failure, who would interrupt here?
         }
@@ -79,10 +79,10 @@ class DataCollectionService private constructor(private val rootDir: Path, priva
         val stopped = dataCollectors.stream().map { success.getOrDefault(it, false) }.allMatch { it }
         running = false
         onStoppedCallback(stopped)
-        return stopped
     }
 
     fun setup(onReady: (setupSuccess: Boolean) -> Unit) = runBlocking {
+        val latch = CountDownLatch(dataCollectors.size)
         val success = ConcurrentHashMap<DataCollector, Boolean>()
 
         if (permissionsService.checkOrGetPerms(activity)) {

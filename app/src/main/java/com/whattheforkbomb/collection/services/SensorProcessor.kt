@@ -137,7 +137,7 @@ class SensorProcessor(private val sensorManager: SensorManager) : DataCollector 
         return true
     }
 
-    override fun stop(): Boolean {
+    override fun stop(onStoppedCallback: (stopSuccessful: Boolean) -> Unit): Boolean {
         closing = true
         timer?.cancel()
         return true

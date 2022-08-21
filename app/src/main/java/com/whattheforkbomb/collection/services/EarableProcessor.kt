@@ -57,6 +57,19 @@ class EarableProcessor(private val appContext: Context) : DataCollector {
             // not already connected,
             manager.connect(CONNECTION_TIMEOUT)
         }
+
+        eSenseManager?.registerSensorListener({ eSenseEvent: ESenseEvent ->
+//            Log.d(TAG, "ESense Event received.")
+            if (!closing) {
+                if (writing) {
+                    fileWriter!!.appendLine(eSenseEvent.toCSV(esenseConfig!!))
+                    fileWriter!!.flush()
+                }
+            } else {
+                fileWriter?.close()
+                writing = false
+            }
+        }, SAMPLING_RATE)
     }
 
     override fun start(rootDir: String): Boolean {
@@ -67,25 +80,17 @@ class EarableProcessor(private val appContext: Context) : DataCollector {
             csvFile.delete()
         }
         csvFile.createNewFile()
-        val fw = FileWriter(csvFile)
-        fw.appendLine(ESenseEvent.HEADER)
-        fileWriter = fw
-        eSenseManager?.registerSensorListener({ eSenseEvent: ESenseEvent ->
-//            Log.d(TAG, "ESense Event received.")
-            if (!closing) {
-                fw.appendLine(eSenseEvent.toCSV(esenseConfig!!))
-                fw.flush()
-            } else {
-                fileWriter?.close()
-            }
-        }, SAMPLING_RATE)
+        fileWriter = FileWriter(csvFile)
+        fileWriter!!.appendLine(ESenseEvent.HEADER)
+        writing = true
 
         return true
     }
 
-    override fun stop(): Boolean {
+    override fun stop(onStoppedCallback: (stopSuccessful: Boolean) -> Unit): Boolean {
         eSenseManager?.unregisterSensorListener()
         closing = true
+
         return true
     }
 

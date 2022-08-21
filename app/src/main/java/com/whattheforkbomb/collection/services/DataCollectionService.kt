@@ -59,9 +59,26 @@ class DataCollectionService private constructor(private val rootDir: Path, priva
         }
     }
 
-    fun stop(): Boolean {
-        val stopped = dataCollectors.parallelStream().map { it.stop() }.allMatch { it }
+    fun stop(onStoppedCallback: (Boolean) -> Unit): Boolean {
+        val success = ConcurrentHashMap<DataCollector, Boolean>()
+
+        dataCollectors.parallelStream().forEach { collector ->
+            Log.i(TAG, "Stopping ${collector.javaClass.name}...")
+            collector.stop {
+                success[collector] = true
+                Log.i(TAG, "Countdown ${collector.javaClass.name}...")
+                latch.countDown()
+            }
+        }
+        try {
+            latch.await(10, TimeUnit.SECONDS)
+        } catch (iex: InterruptedException) {
+            // Failure, who would interrupt here?
+        }
+        Log.i(TAG, success.entries.joinToString(" | "))
+        val stopped = dataCollectors.stream().map { success.getOrDefault(it, false) }.allMatch { it }
         running = false
+        onStoppedCallback(stopped)
         return stopped
     }
 

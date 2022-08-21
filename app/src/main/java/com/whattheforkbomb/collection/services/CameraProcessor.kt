@@ -30,6 +30,7 @@ import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.fixedRateTimer
 import kotlin.io.path.pathString
 
@@ -38,6 +39,9 @@ class CameraProcessor(private val appContext: Context): DataCollector {
 
     private lateinit var executor: ExecutorService
     private lateinit var fileSavingExecutor: ExecutorService
+    private val jobCount = AtomicInteger(0)
+    @Volatile private var stopping = false
+    @Volatile private lateinit var onStoppedCallback: (stopSuccessful: Boolean) -> Unit
 
     // Camera 2
     private lateinit var onCamera2ReadyCallback: (success: Boolean) -> Unit
@@ -68,8 +72,11 @@ class CameraProcessor(private val appContext: Context): DataCollector {
 
     // TODO: add method to 'wait' for job to finish, probs add to interface also
 
-    override fun stop(): Boolean {
+    override fun stop(onStoppedCallback: (stopSuccessful: Boolean) -> Unit): Boolean {
         captureSession?.stopRepeating()
+        stopping = true
+        Log.i(TAG, "Stop called with ${jobCount.get()} photos still being processed")
+        this.onStoppedCallback = onStoppedCallback
         return true
     }
 
@@ -171,11 +178,10 @@ class CameraProcessor(private val appContext: Context): DataCollector {
         captureSession!!.setSingleRepeatingRequest(request.build(), executor, object : CameraCaptureSession.CaptureCallback() {
             override fun onCaptureCompleted(session: CameraCaptureSession, request: CaptureRequest, result: TotalCaptureResult) {
                 super.onCaptureCompleted(session, request, result)
-                if (camera2ShouldCapture) {
+                if (camera2ShouldCapture || stopping) {
                     val image = imageReader?.acquireNextImage()
                     if (image != null) {
-
-                        // TODO: increment atomic int
+                        jobCount.incrementAndGet()
                         camera2ShouldCapture = false
                         val timeToProcessImage = currentTimeMillis()
                         val size = WIDTH*HEIGHT
@@ -291,6 +297,11 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                                 Log.e(TAG, "Unable to write image to file", ioex)
                             } catch (iaex: IllegalArgumentException) {
                                 Log.w(TAG, "Unable to write image to file as no pixels available.", iaex)
+                            }
+                            val count = jobCount.decrementAndGet()
+                            if (stopping && count == 0) {
+                                stopping = false
+                                onStoppedCallback(true)
                             }
                         }
                         val now = currentTimeMillis()

@@ -235,7 +235,7 @@ class DataCollectionFragment : Fragment() {
         binding.buttonNext.isEnabled = false
         binding.buttonNext.text = "Record"
         recording=false
-        model.dataCollectionService.stop()
+        model.dataCollectionService.stop({stopped: Boolean -> Log.i(TAG, "Collectors stopped $stopped")})
         binding.progress.progress = binding.progress.progress + 1
         binding.target.scaleX = 1.0F
         binding.target.scaleY = 1.0F

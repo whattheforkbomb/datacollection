@@ -316,7 +316,7 @@ public class ESenseManager {
             return ESenseSamplingStatus.ERROR;
         }
         BluetoothGattCharacteristic c = mCharacteristicMap.get(CONFIG_CHARACTERISTIC);
-        byte[] bytes = new byte[]{0x53, 0x00, 0x02, 0x01, (byte) samplingRate};
+        byte[] bytes = new byte[]{0x53, 0x00, 0x02, 0x01, 0x32}; //(byte) samplingRate};
         bytes[1] = getCheckSum(bytes,1);
         c.setValue(bytes);
         mGatt.writeCharacteristic(c);

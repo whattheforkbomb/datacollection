@@ -31,8 +31,6 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.fixedRateTimer
 import kotlin.io.path.pathString
-import kotlin.math.ceil
-
 
 // Sampling code from: https://github.com/android/camera-samples/blob/main/Camera2Basic/app/src/main/java/com/example/android/camera2/basic/fragments/CameraFragment.kt
 class CameraProcessor(private val appContext: Context): DataCollector {
@@ -277,6 +275,7 @@ class CameraProcessor(private val appContext: Context): DataCollector {
     // GC is issue as will block until complete...
     // OOM Error also likely if saving RAW...
     private fun camera2ImageCapture(path: String): Boolean = if (camera2 != null) {
+        stopping = false
         photoPath = path
         Log.i(TAG, "Setting-up repeating capture request for camera2")
         val request = camera2!!.createCaptureRequest(CameraDevice.TEMPLATE_ZERO_SHUTTER_LAG)
@@ -300,8 +299,8 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                         camera2ShouldCapture = false
                         val size = HEIGHT*WIDTH
                         val uvSize = size/2
-                        val yBytes = ByteArray(size)
-                        image.planes[0].buffer.get(yBytes)
+//                        val yBytes = ByteArray(size)
+//                        image.planes[0].buffer.get(yBytes)
 //                        val uBytes: ByteArray = ByteArray(uvSize-1)
 //                        image.planes[1].buffer.get(uBytes!!)
 //                        val vBytes: ByteArray = ByteArray(uvSize-1)
@@ -309,6 +308,10 @@ class CameraProcessor(private val appContext: Context): DataCollector {
 //                        val uvBytes = ByteArray(uvSize)
 //                        image.planes[1].buffer.get(uvBytes, 0, uvSize - 1)
 //                        uvBytes[uvSize-1] = image.planes[2].buffer[uvSize-2]
+                        val yuvBytes = ByteArray(size+uvSize)
+                        image.planes[0].buffer.get(yuvBytes, 0, size)
+                        image.planes[1].buffer.get(yuvBytes, size, uvSize - 1)
+                        yuvBytes[size+uvSize-1] = image.planes[2].buffer[uvSize-2]
 //                        val pixelStride = image.planes[1].pixelStride
 //                        val rowStride = image.planes[1].rowStride
                         image.close()
@@ -316,50 +319,51 @@ class CameraProcessor(private val appContext: Context): DataCollector {
                         timestampFormat.timeZone = TimeZone.getTimeZone("UTC")
                         val timestamp = timestampFormat.format(Date())
                         fileSavingExecutor.submit {
-                            var rgb: IntArray? = IntArray(size)
-                                try {
-                                    // greyscale
-                                    for (i in 0 until size) {
-                                        val y = yBytes[i].toInt() and 0xFF.let {
-                                            if (it > 255) 255 else if (it < 0) 0 else it
-                                        }
-                                        rgb!![i]=(0xFF shl 24) +
-                                                (y shl 16) +
-                                                (y shl 8) +
-                                                (y)
-                                    }
-//                                    // rgb
-//                                    var index = 0
-//                                    var uvX = 0
-//                                    var uvY = 0
-//                                    for (xIdx in 0 until HEIGHT) {
-//                                        for (yIdx in 0 until WIDTH) {
-//                                            val y = ((yBytes!![index].toInt()) and 0xFF).let {
-//                                                if (it > 255) 255 else if (it < 0) 0 else it
-//                                            }
-//                                            val uvIdx = uvX + uvY
-//                                            val u = ((uvBytes[uvIdx].toInt() and 0xFF) - 128)
-//                                            val v = ((uvBytes[uvIdx+1].toInt() and 0xFF) - 128)
-//                                            rgb!![index] = getRGB(y, u, v)
-//                                            if (yIdx % 2 == 1) uvY += pixelStride
-//                                            index++
+//                            var rgb: IntArray? = IntArray(size)
+//                                try {
+//                                    // greyscale
+//                                    for (i in 0 until size) {
+//                                        val y = yBytes[i].toInt() and 0xFF.let {
+//                                            if (it > 255) 255 else if (it < 0) 0 else it
 //                                        }
-//                                        if (xIdx % 2 == 1) uvX+=rowStride
-//                                        uvY = 0
+//                                        rgb!![i]=(0xFF shl 24) +
+//                                                (y shl 16) +
+//                                                (y shl 8) +
+//                                                (y)
 //                                    }
-                                } catch (pkm: Exception) {
-                                    Log.e(TAG, "Something Went Wrong, Size: $size", pkm)
-                                    return@submit
-                                }
-//                            uBytes = null
-//                            vBytes = null
-                            val bmp = Bitmap.createBitmap(rgb!!, WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
-                            rgb = null
-                            val photoFile = File(Paths.get(photoPath, "$timestamp$extension").toUri())
+////                                    // rgb
+////                                    var index = 0
+////                                    var uvX = 0
+////                                    var uvY = 0
+////                                    for (xIdx in 0 until HEIGHT) {
+////                                        for (yIdx in 0 until WIDTH) {
+////                                            val y = ((yBytes!![index].toInt()) and 0xFF).let {
+////                                                if (it > 255) 255 else if (it < 0) 0 else it
+////                                            }
+////                                            val uvIdx = uvX + uvY
+////                                            val u = ((uvBytes[uvIdx].toInt() and 0xFF) - 128)
+////                                            val v = ((uvBytes[uvIdx+1].toInt() and 0xFF) - 128)
+////                                            rgb!![index] = getRGB(y, u, v)
+////                                            if (yIdx % 2 == 1) uvY += pixelStride
+////                                            index++
+////                                        }
+////                                        if (xIdx % 2 == 1) uvX+=rowStride
+////                                        uvY = 0
+////                                    }
+//                                } catch (pkm: Exception) {
+//                                    Log.e(TAG, "Something Went Wrong, Size: $size", pkm)
+//                                    return@submit
+//                                }
+////                            uBytes = null
+////                            vBytes = null
+//                            val bmp = Bitmap.createBitmap(rgb!!, WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
+//                            rgb = null
+                            val photoFile = File(Paths.get(photoPath, "$timestamp.yuv"/*$extension"*/).toUri())
                             try {
                                 FileOutputStream(photoFile).use { fos ->
-                                    bmp.compress(Bitmap.CompressFormat.PNG, 100, fos)
-                                    bmp.recycle()
+//                                    bmp.compress(Bitmap.CompressFormat.PNG, 100, fos)
+//                                    bmp.recycle()
+                                    fos.write(yuvBytes)
                                 }
                                 val count = jobCount.decrementAndGet()
                                 if (stopping && count == 0) {
@@ -391,7 +395,7 @@ class CameraProcessor(private val appContext: Context): DataCollector {
         private const val JPEG_EXT = ".jpeg"
         private const val RAW_EXT = ".dng"
         private const val TAG = "CP"
-        private const val SAMPLE_RATE = 50L//(1000 / 30).toLong()
+        private const val SAMPLE_RATE = 20L//(1000 / 30).toLong()
         private const val IMAGE_BUFFER_SIZE: Int = 3
         private const val RAW_MODE = false
 
